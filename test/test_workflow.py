@@ -1,0 +1,117 @@
+import time
+import unittest
+import pipegram as pg
+
+
+def a1(*args, **kwargs):
+    print('a1 starts', args, kwargs)
+    time.sleep(1)
+    return 'a1'
+
+
+def a2(*args, **kwargs):
+    print('a2 starts', args, kwargs)
+    time.sleep(2)
+
+
+def a3(*args, **kwargs):
+    print('a3 starts', args, kwargs)
+    time.sleep(3)
+
+
+def a4(*args, **kwargs):
+    print('a4 starts', args, kwargs)
+    time.sleep(4)
+
+
+def b1(*args, **kwargs):
+    print('b1 starts', args, kwargs)
+    time.sleep(4)
+
+
+def b2(*args, **kwargs):
+    print('b2 starts', args, kwargs)
+    time.sleep(3)
+
+
+def b3(*args, **kwargs):
+    print('b3 starts', args, kwargs)
+    time.sleep(2)
+
+
+def b4(*args, **kwargs):
+    print('b4 starts', args, kwargs)
+    time.sleep(1)
+
+
+def c1(*args, **kwargs):
+    print('c1 starts', args, kwargs)
+    time.sleep(1)
+
+
+def c2(*args, **kwargs):
+    print('c2 starts', args, kwargs)
+    time.sleep(2)
+
+
+def i1(*args, **kwargs):
+    print('i1 starts', args, kwargs)
+    time.sleep(3)
+
+
+def i2(*args, **kwargs):
+    print('i2 starts', args, kwargs)
+    time.sleep(2)
+
+
+def i3(*args, **kwargs):
+    print('i3 starts', args, kwargs)
+    time.sleep(1)
+
+
+class TestWorkflow(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        pass
+
+    def setUp(self) -> None:
+        pass
+
+    def tearDown(self) -> None:
+        pass
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        pass
+
+    def test_workflow_1(self):
+        wf = pg.Workflow()
+        wf.add('a1', a1, args=('a1',), kwargs={'value': 'a1'})
+        wf.add('a2', a2, args=('a2',), kwargs={'value': 'a2'})
+        wf.add('a3', a3, args=('a3',), kwargs={'value': 'a3'})
+        wf.add('a4', a4, args=('a4',), kwargs={'value': 'a4'})
+        wf.add('b1', b1, args=('b1',), kwargs={'value': wf.p('a1')}, after={'a1'})
+        wf.add('b2', b2, args=('b2',), kwargs={'value': 'b2'}, after={'a1', 'a2', 'a3'})
+        wf.add('b3', b3, args=('b3',), kwargs={'value': 'b3'}, after={'a2', 'a3'})
+        wf.add('b4', b4, args=('b4',), kwargs={'value': 'b4'}, after={'a4'})
+        wf.add('c1', c1, args=('c1',), kwargs={'value': 'c1'}, after={'b1'})
+        wf.add('c2', c2, args=('c2',), kwargs={'value': 'c2'}, after={'b2', 'b3', 'b4'})
+        wf.add('i1', i1, args=('i1',), kwargs={'value': 'i1'})
+        wf.add('i2', i2, args=('i2',), kwargs={'value': 'i2'})
+        wf.add('i3', i3, args=('i3',), kwargs={'value': 'i3'})
+        wf.run()
+
+    def test_workflow_2(self):
+        wf = pg.Workflow()
+        wf.add('a1', a1, args=('a1',), kwargs={'value': 'a1'})
+        wf.add('a2', a2, args=('a2',), kwargs={'value': 'a2'}, after={'a1'})
+        wf.add('a3', a3, args=('a3',), kwargs={'value': 'a3'}, after={'a2'})
+        wf.add('a4', a4, args=('a4',), kwargs={'value': 'a4'}, after={'a3'})
+        wf.add('b1', b1, args=('b1',), kwargs={'value': 'b1'}, after={'a1', 'a2', 'a3', 'a4'})
+        wf.add('b2', b2, args=('b2',), kwargs={'value': 'b2'}, after={'a1', 'a2', 'a3', 'a4', 'b1'})
+        wf.add('b3', b2, args=('b3',), kwargs={'value': 'b3'}, after={'a1', 'a2', 'a3', 'a4', 'b1', 'b2'})
+        wf.add('b4', b4, args=('b4',), kwargs={'value': 'b4'}, after={'a1', 'a2', 'a3', 'a4', 'b1', 'b2', 'b3'})
+        wf.add('c1', c1, args=('c1',), kwargs={'value': 'c1'}, after={'a1', 'a2', 'a3', 'a4', 'b1', 'b2', 'b3', 'b4'})
+        wf.add('c2', c1, args=('c2',), kwargs={'value': 'c2'}, after={'a1', 'b1'})
+        wf.run()
