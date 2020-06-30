@@ -416,19 +416,19 @@ class Workflow:
 
     def __run_parallel(self):
         n_level = len(self.__chain)
-        pool = Workflow.__init_pool(self.__n_workers, self.__maxtasksperchild)
-        if n_level == 0:  # all independent tasks
-            Workflow.__run_simple(pool, self.__tasks, self.__interval)
-        else:
-            if (m := self.__method) == 'mix':
-                run_core = Workflow.__run_mix
-            elif m == 'bfs':
-                run_core = Workflow.__run_bfs
-            elif m == 'dfs':
-                run_core = Workflow.__run_dfs
+        with Workflow.__init_pool(self.__n_workers, self.__maxtasksperchild) as pool:
+            if n_level == 0:  # all independent tasks
+                Workflow.__run_simple(pool, self.__tasks, self.__interval)
             else:
-                raise ValueError(f'unrecognized method "{m}"')
-            run_core(pool, self.__chain, self.__tasks, self.__n_ind_workers, self.__interval)
+                if (m := self.__method) == 'mix':
+                    run_core = Workflow.__run_mix
+                elif m == 'bfs':
+                    run_core = Workflow.__run_bfs
+                elif m == 'dfs':
+                    run_core = Workflow.__run_dfs
+                else:
+                    raise ValueError(f'unrecognized method "{m}"')
+                run_core(pool, self.__chain, self.__tasks, self.__n_ind_workers, self.__interval)
 
     def __run_single(self):
         chain = self.__chain
