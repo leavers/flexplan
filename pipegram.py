@@ -112,6 +112,9 @@ class Workflow:
         def name(self):
             return self.__name
 
+        def __str__(self):
+            return f'Placeholder for "{self.__name}"'
+
     class Task:
         def __init__(self, func: Callable, args: tuple = None, kwargs: dict = None,
                      error: str = 'raise', coerce=None):
@@ -120,6 +123,7 @@ class Workflow:
             self.kwargs = kwargs if kwargs is not None else dict()
             self.__res: Optional[mp.pool.ApplyResult] = None
             self.__ready: bool = False
+            self.__got: bool = False
             self.__ret = None
             self.__err = error
             self.__cr = coerce
@@ -158,18 +162,23 @@ class Workflow:
                 raise ValueError(f'unrecognized error handler "{err}"') from None
 
         def get(self, timeout: int = 15):
-            if not self.__ready:
-                try:
-                    self.__ret = self.__res.get(timeout)
-                except Exception as exc:
-                    self.__handle_exc(exc)
-                finally:
-                    self.__ready = True
+            if self.__got:
+                return self.__ret
+            try:
+                self.__ret = self.__res.get(timeout)
+            except Exception as exc:
+                self.__handle_exc(exc)
+            finally:
+                self.__ready = True
+                self.__got = True
             return self.__ret
 
         def get_local(self):
+            if self.__got:
+                return self.__ret
             try:
                 self.__ret = self.func(*self.args, **self.kwargs)
+                self.__got = True
             except Exception as exc:
                 self.__handle_exc(exc)
             finally:
@@ -179,11 +188,8 @@ class Workflow:
         @staticmethod
         def __fill_ph(items: Dict[Hashable, 'Workflow.Task'], key: Hashable,
                       handler: Callable = None, h_args: tuple = None, h_kwargs: dict = None):
-            if key not in items:
-                raise KeyError(key)
-            else:
-                ret = items[key].get()
-                return ret if handler is None else handler(ret, *h_args, **h_kwargs)
+            ret = items[key].get()
+            return ret if handler is None else handler(ret, *h_args, **h_kwargs)
 
         def fill_placeholders(self, items: Dict[Hashable, 'Workflow.Task'],
                               handler: Callable = None, h_args: tuple = None, h_kwargs: dict = None):
@@ -341,7 +347,7 @@ class Workflow:
             visit_set.clear()
             analyze.clear()
             for name, task in tasks.items():  # check status
-                if not task.ready():
+                if not task.ready() or name in done_set:
                     continue
                 task.get()
                 done_set.add(name)
@@ -366,7 +372,7 @@ class Workflow:
             apply_ind(pool, tasks, ind_set, done_set, ind_running_set, n_ind_workers)  # independent tasks
             curr_level, level_tasks = apply_bfs(pool, chain, tasks, level_tasks, done_set, curr_level, n_levels)  # bfs
             for name, task in tasks.items():  # check status
-                if not task.ready():
+                if not task.ready() or name in done_set:
                     continue
                 task.get()
                 done_set.add(name)
@@ -393,7 +399,7 @@ class Workflow:
             apply_dfs(pool, chain, tasks, done_set, analyze)  # dfs
             curr_level, level_tasks = apply_bfs(pool, chain, tasks, level_tasks, done_set, curr_level, n_levels)  # bfs
             for name, task in tasks.items():  # check status
-                if not task.ready():
+                if not task.ready() or name in done_set:
                     continue
                 task.get()
                 done_set.add(name)
