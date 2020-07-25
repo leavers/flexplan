@@ -252,6 +252,21 @@ class Workflow:
     def p(name):
         return Workflow.Placeholder(name)
 
+    def __getitem__(self, index: int) -> Set[Hashable]:
+        return self.__chain[index]
+
+    def size(self) -> int:
+        return self.__chain.size()
+
+    def invalid_items(self) -> Set[Hashable]:
+        return self.__chain.invalid_items()
+
+    def independent_items(self) -> Set[Hashable]:
+        return self.__chain.independent_items()
+
+    def dependent_items(self) -> Set[Hashable]:
+        return self.__chain.dependent_items()
+
     @staticmethod
     def __run_simple(pool: mp.Pool, tasks: Dict[Hashable, 'Workflow.Task'], interval: float):
         n_tasks = len(tasks)
