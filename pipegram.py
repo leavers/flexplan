@@ -195,11 +195,29 @@ class Workflow:
                 self.__ready = True
             return self.__ret
 
-        @staticmethod
-        def __fill_ph(items: Dict[Hashable, 'Workflow.Task'], key: Hashable,
-                      handler: Callable = None, h_args: tuple = None, h_kwargs: dict = None):
+        @classmethod
+        def _fill_ph(cls, items: Dict[Hashable, 'Workflow.Task'], key: Hashable,
+                     handler: Callable = None, h_args: tuple = None, h_kwargs: dict = None):
             ret = items[key].get()
             return ret if handler is None else handler(ret, *h_args, **h_kwargs)
+
+        @classmethod
+        def _fill_ph_rec(cls, items: Dict[Hashable, 'Workflow.Task'], val,
+                         handler: Callable = None, h_args: tuple = None, h_kwargs: dict = None):
+            if not isinstance(val, (Workflow.Placeholder, tuple, list, set, dict)):
+                return val
+            elif isinstance(val, Workflow.Placeholder):
+                return Workflow.Task._fill_ph(items, val.name, handler, h_args, h_kwargs)
+            elif isinstance(val, (tuple, list, set)):
+                clz = type(val)
+                arg_list = list(val)
+                for i, arg in enumerate(arg_list):
+                    arg_list[i] = cls._fill_ph_rec(items, arg, handler, h_args, h_kwargs)
+                return clz(arg_list)
+            elif isinstance(val, dict):
+                for k, v in val.items():
+                    val[k] = cls._fill_ph_rec(items, v, handler, h_args, h_kwargs)
+                return dict(val)
 
         def fill_placeholders(self, items: Dict[Hashable, 'Workflow.Task'],
                               handler: Callable = None, h_args: tuple = None, h_kwargs: dict = None):
@@ -207,16 +225,8 @@ class Workflow:
                 h_args = tuple()
             if h_kwargs is None:
                 h_kwargs = dict()
-            arg_list = list(self.args)
-            for i, arg in enumerate(arg_list):
-                if not isinstance(arg, Workflow.Placeholder):
-                    continue
-                arg_list[i] = Workflow.Task.__fill_ph(items, arg.name, handler, h_args, h_kwargs)
-            self.args = tuple(arg_list)
-            for k, v in self.kwargs.items():
-                if not isinstance(v, Workflow.Placeholder):
-                    continue
-                self.kwargs[k] = Workflow.Task.__fill_ph(items, v.name, handler, h_args, h_kwargs)
+            self.args = self._fill_ph_rec(items, self.args, handler, h_args, h_kwargs)
+            self.kwargs = self._fill_ph_rec(items, self.kwargs, handler, h_args, h_kwargs)
 
     def __init__(self,
                  workers: int = None,
@@ -232,7 +242,7 @@ class Workflow:
         self.__maxtasksperchild = maxtasksperchild
         self.__ir = max(min(independent_ratio, 1.0), 0.05)
         self.__n_ind_workers = math.ceil(self.__n_workers * self.__ir)
-        self.__n_dep_worders = self.__n_workers - self.__n_ind_workers
+        self.__n_dep_workers = self.__n_workers - self.__n_ind_workers
         self.__interval = max(check_interval, 0.001)
         self.__chain = DependencyChain()
         self.__tasks: Dict[Hashable, Workflow.Task] = dict()
@@ -248,9 +258,9 @@ class Workflow:
         self.__tasks[name] = Workflow.Task(name, task,
                                            args=args, kwargs=kwargs, error=error, coerce=coerce)
 
-    @staticmethod
-    def p(name):
-        return Workflow.Placeholder(name)
+    @classmethod
+    def p(cls, name):
+        return cls.Placeholder(name)
 
     def __getitem__(self, index: int) -> Set[Hashable]:
         return self.__chain[index]
@@ -267,8 +277,8 @@ class Workflow:
     def dependent_items(self) -> Set[Hashable]:
         return self.__chain.dependent_items()
 
-    @staticmethod
-    def __run_simple(pool: mp.Pool, tasks: Dict[Hashable, 'Workflow.Task'], interval: float):
+    @classmethod
+    def __run_simple(cls, pool: mp.Pool, tasks: Dict[Hashable, 'Workflow.Task'], interval: float):
         n_tasks = len(tasks)
         done_set = set()
         for name, task in tasks.items():
@@ -281,14 +291,14 @@ class Workflow:
                 done_set.add(name)
             time.sleep(interval)
 
-    @staticmethod
-    def __apply_ind(pool: mp.Pool, tasks: Dict[Hashable, 'Workflow.Task'],
+    @classmethod
+    def __apply_ind(cls, pool: mp.Pool, tasks: Dict[Hashable, 'Workflow.Task'],
                     ind_set: set, dep_set: set, done_set: set, ind_running_set: set,
-                    n_dep_worders: int, n_ind_workers: int):
+                    n_dep_workers: int, n_ind_workers: int):
         if all([t in done_set for t in ind_set]):
             return
         ind_running_set -= done_set
-        run_all = len(dep_set - done_set) <= n_dep_worders
+        run_all = len(dep_set - done_set) <= n_dep_workers
         if len(ind_running_set) < n_ind_workers:
             for t in ind_set:
                 task = tasks[t]
@@ -301,8 +311,8 @@ class Workflow:
                 if len(ind_running_set) >= n_ind_workers:
                     break
 
-    @staticmethod
-    def __apply_bfs(pool: mp.Pool, chain: DependencyChain, tasks: Dict[Hashable, 'Workflow.Task'],
+    @classmethod
+    def __apply_bfs(cls, pool: mp.Pool, chain: DependencyChain, tasks: Dict[Hashable, 'Workflow.Task'],
                     level_tasks: set, done_set: set, curr_level: int, n_levels: int):
         if all([t in done_set for t in level_tasks]):  # bfs
             if curr_level + 1 < n_levels:
@@ -316,8 +326,8 @@ class Workflow:
                     task.result = pool.apply_async(task.func, args=task.args, kwds=task.kwargs)
         return curr_level, level_tasks
 
-    @staticmethod
-    def __apply_dfs(pool: mp.Pool, chain: DependencyChain, tasks: Dict[Hashable, 'Workflow.Task'],
+    @classmethod
+    def __apply_dfs(cls, pool: mp.Pool, chain: DependencyChain, tasks: Dict[Hashable, 'Workflow.Task'],
                     done_set: set, analyze: set):
         for item in analyze:  # dfs
             subs = chain.sub_of(item)
@@ -329,8 +339,8 @@ class Workflow:
                     task.result = pool.apply_async(task.func, args=task.args, kwds=task.kwargs)
         analyze.clear()
 
-    @staticmethod
-    def __apply_dfs_recv(pool: mp.Pool, chain: DependencyChain, tasks: Dict[Hashable, 'Workflow.Task'],
+    @classmethod
+    def __apply_dfs_recv(cls, pool: mp.Pool, chain: DependencyChain, tasks: Dict[Hashable, 'Workflow.Task'],
                          done_set: set, visit_set: set, name: Hashable):
         subs = chain.sub_of(name)
         for sub in subs:
@@ -353,9 +363,9 @@ class Workflow:
                 task.fill_placeholders(tasks)
                 task.result = pool.apply_async(task.func, args=task.args, kwds=task.kwargs)
 
-    @staticmethod
-    def __run_dfs(pool: mp.Pool, chain: DependencyChain, tasks: Dict[Hashable, 'Workflow.Task'],
-                  n_dep_worders: int, n_ind_workers: int, interval: float):
+    @classmethod
+    def __run_dfs(cls, pool: mp.Pool, chain: DependencyChain, tasks: Dict[Hashable, 'Workflow.Task'],
+                  n_dep_workers: int, n_ind_workers: int, interval: float):
         n_tasks = chain.size()
         done_set = set()
         ind_set = chain.independent_items()
@@ -373,7 +383,7 @@ class Workflow:
             task.result = pool.apply_async(task.func, args=task.args, kwds=task.kwargs)
         while len(done_set) != n_tasks:
             apply_ind(pool, tasks, ind_set, dep_set, done_set, ind_running_set,
-                      n_dep_worders, n_ind_workers)  # independent tasks
+                      n_dep_workers, n_ind_workers)  # independent tasks
             for item in analyze:  # dfs
                 apply_dfs(pool, chain, tasks, done_set, visit_set, item)
             visit_set.clear()
@@ -386,9 +396,9 @@ class Workflow:
                 analyze.add(name)
             time.sleep(interval)
 
-    @staticmethod
-    def __run_bfs(pool: mp.Pool, chain: DependencyChain, tasks: Dict[Hashable, 'Workflow.Task'],
-                  n_dep_worders: int, n_ind_workers: int, interval: float):
+    @classmethod
+    def __run_bfs(cls, pool: mp.Pool, chain: DependencyChain, tasks: Dict[Hashable, 'Workflow.Task'],
+                  n_dep_workers: int, n_ind_workers: int, interval: float):
         n_tasks = chain.size()
         done_set = set()
         ind_set = chain.independent_items()
@@ -403,7 +413,7 @@ class Workflow:
 
         while len(done_set) != n_tasks:
             apply_ind(pool, tasks, ind_set, dep_set, done_set, ind_running_set,
-                      n_dep_worders, n_ind_workers)  # independent tasks
+                      n_dep_workers, n_ind_workers)  # independent tasks
             curr_level, level_tasks = apply_bfs(pool, chain, tasks, level_tasks, done_set, curr_level, n_levels)  # bfs
             for name, task in tasks.items():  # check status
                 if not task.ready() or name in done_set:
@@ -412,9 +422,9 @@ class Workflow:
                 done_set.add(name)
             time.sleep(interval)
 
-    @staticmethod
-    def __run_mix(pool: mp.Pool, chain: DependencyChain, tasks: Dict[Hashable, 'Workflow.Task'],
-                  n_dep_worders: int, n_ind_workers: int, interval: float):
+    @classmethod
+    def __run_mix(cls, pool: mp.Pool, chain: DependencyChain, tasks: Dict[Hashable, 'Workflow.Task'],
+                  n_dep_workers: int, n_ind_workers: int, interval: float):
         n_tasks = chain.size()
         done_set = set()
         ind_set = chain.independent_items()
@@ -431,7 +441,7 @@ class Workflow:
 
         while len(done_set) != n_tasks:
             apply_ind(pool, tasks, ind_set, dep_set, done_set, ind_running_set,
-                      n_dep_worders, n_ind_workers)  # independent tasks
+                      n_dep_workers, n_ind_workers)  # independent tasks
             apply_dfs(pool, chain, tasks, done_set, analyze)  # dfs
             curr_level, level_tasks = apply_bfs(pool, chain, tasks, level_tasks, done_set, curr_level, n_levels)  # bfs
             for name, task in tasks.items():  # check status
@@ -442,8 +452,8 @@ class Workflow:
                 analyze.add(name)
             time.sleep(interval)
 
-    @staticmethod
-    def __init_pool(processes: int, maxtasksperchild: int) -> mp.Pool:
+    @classmethod
+    def __init_pool(cls, processes: int, maxtasksperchild: int) -> mp.Pool:
         if sys.platform == 'linux':
             signal.pthread_sigmask(signal.SIG_BLOCK, [signal.SIGINT, signal.SIGTERM])
             pool = mp.Pool(processes=processes, maxtasksperchild=maxtasksperchild)
@@ -470,7 +480,7 @@ class Workflow:
                     run_core = Workflow.__run_dfs
                 else:
                     raise ValueError(f'unrecognized method "{m}"')
-                run_core(pool, self.__chain, self.__tasks, self.__n_dep_worders, self.__n_ind_workers, self.__interval)
+                run_core(pool, self.__chain, self.__tasks, self.__n_dep_workers, self.__n_ind_workers, self.__interval)
 
     def __run_single(self):
         chain = self.__chain
