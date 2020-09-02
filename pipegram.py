@@ -1,50 +1,55 @@
-from typing import Callable, Dict, Iterable, Set, Hashable, Optional
+from typing import Any, Callable, Dict, Hashable, Iterable, NoReturn, List, Set, Tuple, Optional, Union
 
 import math
 import os
 import sys
 import signal
-import time
+import threading
 import multiprocessing as mp
+from multiprocessing.pool import ApplyResult
+
+Number = Union[int, float]
 
 
 class DependencyChain:
     def __init__(self):
         self.__priority_of = dict()
-        self.__sub_item_of = dict()
-        self.__sup_item_of = dict()
+        self.__sub_of = dict()
+        self.__sup_of = dict()
         self.__len = 0
 
     def add(self, name: Hashable, after: Iterable[Hashable] = None):
+        if name is None:
+            raise ValueError('param "name" should not be None')
         if name in self.__priority_of:
-            raise ValueError(f'{name} already exists')
+            raise ValueError(f'item {name} already exists')
         if after is None:
-            self.__sup_item_of[name] = set()
+            self.__sup_of[name] = set()
         else:
-            self.__sup_item_of[name] = {after} if isinstance(after, str) else after
+            self.__sup_of[name] = {after} if isinstance(after, str) else after
 
-        if name not in self.__sub_item_of:
-            self.__sub_item_of[name] = set()
-        for pw in self.__sup_item_of[name]:
-            if pw not in self.__sub_item_of:
-                self.__sub_item_of[pw] = set()
-            self.__sub_item_of[pw].add(name)
+        if name not in self.__sub_of:
+            self.__sub_of[name] = set()
+        for pw in self.__sup_of[name]:
+            if pw not in self.__sub_of:
+                self.__sub_of[pw] = set()
+            self.__sub_of[pw].add(name)
 
         self.__priority_of[name] = 0
         self.__update_priority_of(name)
 
     def sub_of(self, item: Hashable) -> Set[Hashable]:
-        return self.__sub_item_of[item]
+        return self.__sub_of[item]
 
     def sup_of(self, item: Hashable) -> Set[Hashable]:
-        return self.__sup_item_of[item]
+        return self.__sup_of[item]
 
     def __update_priority_of(self, name):
-        if 0 == len(self.__sub_item_of[name]) == len(self.__sup_item_of[name]):
+        if 0 == len(self.__sub_of[name]) == len(self.__sup_of[name]):
             self.__priority_of[name] = -1
             return
         priority = self.__priority_of[name]
-        for pw in self.__sup_item_of[name]:
+        for pw in self.__sup_of[name]:
             if pw not in self.__priority_of or -2 == self.__priority_of[pw]:
                 self.__priority_of[name] = -2
                 return
@@ -55,7 +60,7 @@ class DependencyChain:
                 priority = max(priority, self.__priority_of[pw] + 1)
         self.__priority_of[name] = priority
         self.__len = max(self.__len, priority + 1)
-        for sw in self.__sub_item_of[name]:
+        for sw in self.__sub_of[name]:
             self.__update_priority_of(sw)
 
     def __getitem_core(self, index: int) -> Set[Hashable]:
@@ -64,6 +69,9 @@ class DependencyChain:
             if value == index:
                 res.add(key)
         return res
+
+    def __contains__(self, item) -> bool:
+        return item in self.__priority_of
 
     def __getitem__(self, index: int) -> Set[Hashable]:
         if index < 0 or index >= self.__len:
@@ -107,9 +115,7 @@ class DependencyChain:
 
 class Workflow:
     class Placeholder:
-        def __init__(self, name):
-            if name is None or isinstance(name, list):
-                raise ValueError(f'name cannot be None or unhashable type, got {type(name)}')
+        def __init__(self, name: Hashable):
             self.__name = name
 
         @property
@@ -126,7 +132,7 @@ class Workflow:
             self.args = args if args is not None else tuple()
             self.kwargs = kwargs if kwargs is not None else dict()
             self.__name: Hashable = name
-            self.__res: Optional[mp.pool.ApplyResult] = None
+            self.__res: Optional[ApplyResult] = None
             self.__ready: bool = False
             self.__got: bool = False
             self.__ret = None
@@ -141,11 +147,19 @@ class Workflow:
             return self.__name
 
         @property
-        def result(self):
+        def error_strategy(self):
+            return self.__err
+
+        @property
+        def coerce(self):
+            return self.__cr
+
+        @property
+        def apply_result(self) -> Optional[ApplyResult]:
             return self.__res
 
-        @result.setter
-        def result(self, value):
+        @apply_result.setter
+        def apply_result(self, value: ApplyResult):
             self.__res = value
 
         def ready(self) -> bool:
@@ -171,7 +185,7 @@ class Workflow:
             else:
                 raise ValueError(f'unrecognized error handler "{err}"') from None
 
-        def get(self, timeout: int = 15):
+        def get(self, timeout: Number = 15) -> Any:
             if self.__got:
                 return self.__ret
             try:
@@ -183,7 +197,7 @@ class Workflow:
                 self.__got = True
             return self.__ret
 
-        def get_local(self):
+        def get_local(self) -> Any:
             if self.__got:
                 return self.__ret
             try:
@@ -228,6 +242,43 @@ class Workflow:
             self.args = self._fill_ph_rec(items, self.args, handler, h_args, h_kwargs)
             self.kwargs = self._fill_ph_rec(items, self.kwargs, handler, h_args, h_kwargs)
 
+    class Result:
+        def __init__(self, tasks: Dict[Hashable, 'Workflow.Task']):
+            self.__all_done = False
+            self.__done_set = set()
+            self.__tasks = tasks
+
+        def ready(self, name: Hashable = None) -> bool:
+            if name is not None and name not in self.__tasks:
+                raise KeyError(f'Task {name} not found')
+            if self.__all_done:
+                return True
+            if name is not None and name in self.__done_set:
+                return True
+            for task_name, task in self.__tasks.items():
+                if task_name in self.__done_set:
+                    continue
+                if task.ready():
+                    self.__done_set.add(task_name)
+                elif name is None:
+                    return False
+            if len(self.__done_set) == len(self.__tasks):
+                self.__all_done = True
+                return True
+            if name in self.__done_set:
+                return True
+            return False
+
+        def get(self, name: Hashable = None) -> Union[Dict[Hashable, Any], Any]:
+            if name is None:
+                res = dict()
+                for task_name, task in self.__tasks.items():
+                    if self.ready(task_name):
+                        res[task_name] = task.get()
+                return res
+            else:
+                return self.__tasks[name].get() if self.ready(name) else None
+
     def __init__(self,
                  workers: int = None,
                  method: str = 'mix',
@@ -247,6 +298,8 @@ class Workflow:
         self.__chain = DependencyChain()
         self.__tasks: Dict[Hashable, Workflow.Task] = dict()
         self.__1thd_pool = single_thread_pool
+        self.__heartbeat_handler: Optional[List[Callable, Tuple, Dict]] = None
+        self.__detached_thread: Optional[threading.Thread] = None
         # TODO: short circuit and broken circuit
         self.__short_c = list()
         self.__broken_c = list()
@@ -254,16 +307,25 @@ class Workflow:
     def add(self, name: Hashable, task: Callable,
             args: tuple = None, kwargs: dict = None, after: Iterable[Hashable] = None,
             error: str = 'raise', coerce=None):
+        if name is None:
+            raise ValueError('param "name" should not be None')
         self.__chain.add(name, after=after)
-        self.__tasks[name] = Workflow.Task(name, task,
-                                           args=args, kwargs=kwargs, error=error, coerce=coerce)
+        self.__tasks[name] = Workflow.Task(name, task, args=args, kwargs=kwargs,
+                                           error=error, coerce=coerce)
+
+    def set_heartbeat_handler(self, handler: Union[Callable, 'Workflow'], args: tuple = None, kwargs: dict = None):
+        if self.__heartbeat_handler is not None:
+            raise ValueError('handler was set twice')
+        self.__heartbeat_handler = (handler,
+                                    args if args is not None else tuple(),
+                                    kwargs if kwargs is not None else dict())
 
     @classmethod
     def p(cls, name):
         return cls.Placeholder(name)
 
-    def __getitem__(self, index: int) -> Set[Hashable]:
-        return self.__chain[index]
+    def __getitem__(self, name: Hashable) -> 'Workflow.Task':
+        return self.__tasks[name]
 
     def size(self) -> int:
         return self.__chain.size()
@@ -278,18 +340,37 @@ class Workflow:
         return self.__chain.dependent_items()
 
     @classmethod
-    def __run_simple(cls, pool: mp.Pool, tasks: Dict[Hashable, 'Workflow.Task'], interval: float):
+    def __heartbeat(cls, event: threading.Event, interval: float,
+                    tasks: Dict[Hashable, 'Workflow.Task'], done_set: Set[Hashable], analyze: Set[Hashable] = None,
+                    handler: Tuple[Callable, Tuple, Dict] = None):
+        for name, task in tasks.items():  # check status
+            if not task.ready() or name in done_set:
+                continue
+            task.get()
+            done_set.add(name)
+            if analyze is not None:
+                analyze.add(name)
+        if handler is not None:
+            func = handler[0]
+            if isinstance(func, Workflow):
+                func.run()
+            else:
+                func(*handler[1], **handler[2])
+        event.wait(interval)
+
+    @classmethod
+    def __run_simple(cls, pool: mp.Pool,
+                     tasks: Dict[Hashable, 'Workflow.Task'], interval: float,
+                     handler: Tuple[Callable, Tuple, Dict] = None):
         n_tasks = len(tasks)
         done_set = set()
+        event = threading.Event()
+        heartbeat = cls.__heartbeat
+
         for name, task in tasks.items():
-            task.result = pool.apply_async(task.func, args=task.args, kwds=task.kwargs)
+            task.apply_result = pool.apply_async(task.func, args=task.args, kwds=task.kwargs)
         while len(done_set) != n_tasks:
-            for name, task in tasks.items():
-                if not task.ready():
-                    continue
-                task.get()
-                done_set.add(name)
-            time.sleep(interval)
+            heartbeat(event, interval, tasks, done_set=done_set, handler=handler)
 
     @classmethod
     def __apply_ind(cls, pool: mp.Pool, tasks: Dict[Hashable, 'Workflow.Task'],
@@ -304,7 +385,7 @@ class Workflow:
                 task = tasks[t]
                 if task.invoked():
                     continue
-                task.result = pool.apply_async(task.func, args=task.args, kwds=task.kwargs)
+                task.apply_result = pool.apply_async(task.func, args=task.args, kwds=task.kwargs)
                 ind_running_set.add(t)
                 if run_all:
                     continue
@@ -323,7 +404,7 @@ class Workflow:
                 task = tasks[t]
                 if not task.invoked():
                     task.fill_placeholders(tasks)
-                    task.result = pool.apply_async(task.func, args=task.args, kwds=task.kwargs)
+                    task.apply_result = pool.apply_async(task.func, args=task.args, kwds=task.kwargs)
         return curr_level, level_tasks
 
     @classmethod
@@ -336,7 +417,7 @@ class Workflow:
                 s_sups = chain.sup_of(sub)
                 if not task.invoked() and all([s_sup in done_set for s_sup in s_sups]):
                     task.fill_placeholders(tasks)
-                    task.result = pool.apply_async(task.func, args=task.args, kwds=task.kwargs)
+                    task.apply_result = pool.apply_async(task.func, args=task.args, kwds=task.kwargs)
         analyze.clear()
 
     @classmethod
@@ -358,14 +439,15 @@ class Workflow:
                     visit_set.add(s_sup)
                     ss_sups = chain.sup_of(s_sup)
                     for ss_sup in ss_sups:
-                        Workflow.__apply_dfs_recv(pool, chain, tasks, done_set, visit_set, ss_sup)
+                        cls.__apply_dfs_recv(pool, chain, tasks, done_set, visit_set, ss_sup)
             if all([s_sup in done_set for s_sup in s_sups]):
                 task.fill_placeholders(tasks)
-                task.result = pool.apply_async(task.func, args=task.args, kwds=task.kwargs)
+                task.apply_result = pool.apply_async(task.func, args=task.args, kwds=task.kwargs)
 
     @classmethod
     def __run_dfs(cls, pool: mp.Pool, chain: DependencyChain, tasks: Dict[Hashable, 'Workflow.Task'],
-                  n_dep_workers: int, n_ind_workers: int, interval: float):
+                  n_dep_workers: int, n_ind_workers: int, interval: float,
+                  handler: Tuple[Callable, Tuple, Dict] = None):
         n_tasks = chain.size()
         done_set = set()
         ind_set = chain.independent_items()
@@ -374,13 +456,15 @@ class Workflow:
         analyze = set()
         visit_set = set()
 
-        apply_ind = Workflow.__apply_ind
-        apply_dfs = Workflow.__apply_dfs_recv
+        apply_ind = cls.__apply_ind
+        apply_dfs = cls.__apply_dfs_recv
+        event = threading.Event()
+        heartbeat = cls.__heartbeat
 
         for t in chain[0]:
             task = tasks[t]
             task.fill_placeholders(tasks)
-            task.result = pool.apply_async(task.func, args=task.args, kwds=task.kwargs)
+            task.apply_result = pool.apply_async(task.func, args=task.args, kwds=task.kwargs)
         while len(done_set) != n_tasks:
             apply_ind(pool, tasks, ind_set, dep_set, done_set, ind_running_set,
                       n_dep_workers, n_ind_workers)  # independent tasks
@@ -388,17 +472,12 @@ class Workflow:
                 apply_dfs(pool, chain, tasks, done_set, visit_set, item)
             visit_set.clear()
             analyze.clear()
-            for name, task in tasks.items():  # check status
-                if not task.ready() or name in done_set:
-                    continue
-                task.get()
-                done_set.add(name)
-                analyze.add(name)
-            time.sleep(interval)
+            heartbeat(event, interval, tasks, done_set=done_set, analyze=analyze, handler=handler)
 
     @classmethod
     def __run_bfs(cls, pool: mp.Pool, chain: DependencyChain, tasks: Dict[Hashable, 'Workflow.Task'],
-                  n_dep_workers: int, n_ind_workers: int, interval: float):
+                  n_dep_workers: int, n_ind_workers: int, interval: float,
+                  handler: Tuple[Callable, Tuple, Dict] = None):
         n_tasks = chain.size()
         done_set = set()
         ind_set = chain.independent_items()
@@ -408,23 +487,21 @@ class Workflow:
         level_tasks = chain[curr_level]
         ind_running_set = set()
 
-        apply_ind = Workflow.__apply_ind
-        apply_bfs = Workflow.__apply_bfs
+        apply_ind = cls.__apply_ind
+        apply_bfs = cls.__apply_bfs
+        event = threading.Event()
+        heartbeat = cls.__heartbeat
 
         while len(done_set) != n_tasks:
             apply_ind(pool, tasks, ind_set, dep_set, done_set, ind_running_set,
                       n_dep_workers, n_ind_workers)  # independent tasks
             curr_level, level_tasks = apply_bfs(pool, chain, tasks, level_tasks, done_set, curr_level, n_levels)  # bfs
-            for name, task in tasks.items():  # check status
-                if not task.ready() or name in done_set:
-                    continue
-                task.get()
-                done_set.add(name)
-            time.sleep(interval)
+            heartbeat(event, interval, tasks, done_set=done_set, handler=handler)
 
     @classmethod
     def __run_mix(cls, pool: mp.Pool, chain: DependencyChain, tasks: Dict[Hashable, 'Workflow.Task'],
-                  n_dep_workers: int, n_ind_workers: int, interval: float):
+                  n_dep_workers: int, n_ind_workers: int, interval: float,
+                  handler: Tuple[Callable, Tuple, Dict] = None):
         n_tasks = chain.size()
         done_set = set()
         ind_set = chain.independent_items()
@@ -435,22 +512,18 @@ class Workflow:
         ind_running_set = set()
         analyze = set()
 
-        apply_ind = Workflow.__apply_ind
-        apply_dfs = Workflow.__apply_dfs
-        apply_bfs = Workflow.__apply_bfs
+        apply_ind = cls.__apply_ind
+        apply_dfs = cls.__apply_dfs
+        apply_bfs = cls.__apply_bfs
+        event = threading.Event()
+        heartbeat = cls.__heartbeat
 
         while len(done_set) != n_tasks:
             apply_ind(pool, tasks, ind_set, dep_set, done_set, ind_running_set,
                       n_dep_workers, n_ind_workers)  # independent tasks
             apply_dfs(pool, chain, tasks, done_set, analyze)  # dfs
             curr_level, level_tasks = apply_bfs(pool, chain, tasks, level_tasks, done_set, curr_level, n_levels)  # bfs
-            for name, task in tasks.items():  # check status
-                if not task.ready() or name in done_set:
-                    continue
-                task.get()
-                done_set.add(name)
-                analyze.add(name)
-            time.sleep(interval)
+            heartbeat(event, interval, tasks, done_set=done_set, analyze=analyze, handler=handler)
 
     @classmethod
     def __init_pool(cls, processes: int, maxtasksperchild: int) -> mp.Pool:
@@ -468,19 +541,21 @@ class Workflow:
 
     def __run_parallel(self):
         n_level = len(self.__chain)
-        with Workflow.__init_pool(self.__n_workers, self.__maxtasksperchild) as pool:
+        with self.__init_pool(self.__n_workers, self.__maxtasksperchild) as pool:
             if n_level == 0:  # all independent tasks
-                Workflow.__run_simple(pool, self.__tasks, self.__interval)
+                self.__run_simple(pool, self.__tasks, interval=self.__interval, handler=self.__heartbeat_handler)
             else:
                 if (m := self.__method) == 'mix':
-                    run_core = Workflow.__run_mix
+                    run_core = self.__run_mix
                 elif m == 'bfs':
-                    run_core = Workflow.__run_bfs
+                    run_core = self.__run_bfs
                 elif m == 'dfs':
-                    run_core = Workflow.__run_dfs
+                    run_core = self.__run_dfs
                 else:
                     raise ValueError(f'unrecognized method "{m}"')
-                run_core(pool, self.__chain, self.__tasks, self.__n_dep_workers, self.__n_ind_workers, self.__interval)
+                run_core(pool, self.__chain, self.__tasks,
+                         n_dep_workers=self.__n_dep_workers, n_ind_workers=self.__n_ind_workers,
+                         interval=self.__interval, handler=self.__heartbeat_handler)
 
     def __run_single(self):
         chain = self.__chain
@@ -496,14 +571,53 @@ class Workflow:
                     task.fill_placeholders(tasks)
                     task.get_local()
 
-    def run(self):
+    def __reset_tasks(self):
+        tasks = dict()
+        for name, task in self.__tasks.items():
+            tasks[name] = Workflow.Task(task.name, task.func,
+                                        args=task.args, kwargs=task.kwargs,
+                                        error=task.error_strategy, coerce=task.coerce)
+        self.__tasks = tasks
+
+    def run(self) -> Optional['Workflow.Result']:
         invalid_set = self.__chain.invalid_items()
         if len(invalid_set) > 0:
             raise ValueError(f'invalid task(s) exists: {invalid_set}')
         if self.__chain.size() == 0:
-            return
+            return None
 
-        if self.__n_workers == 1 and not self.__1thd_pool:
+        result = Workflow.Result(self.__tasks)
+        if result.ready():
+            self.__reset_tasks()
+            result = Workflow.Result(self.__tasks)
+        if self.__n_workers == 1 and not self.__1thd_pool and self.__heartbeat_handler is None:
             self.__run_single()
         else:
             self.__run_parallel()
+        return result
+
+    def run_detached(self) -> Optional['Workflow.Result']:
+        invalid_set = self.__chain.invalid_items()
+        if len(invalid_set) > 0:
+            raise ValueError(f'invalid task(s) exists: {invalid_set}')
+
+        result = Workflow.Result(self.__tasks)
+        if self.__detached_thread is not None:
+            if not result.ready():
+                raise RuntimeError('failed to invoke run_detached() as '
+                                   'workflow has been triggered and is still running')
+            self.__reset_tasks()
+            result = Workflow.Result(self.__tasks)
+        elif result.ready():
+            self.__reset_tasks()
+            result = Workflow.Result(self.__tasks)
+
+        self.__detached_thread = threading.Thread(target=self.run)
+        self.__detached_thread.start()
+        return result
+
+    def join(self, timeout: Number = None) -> NoReturn:
+        if self.__detached_thread is None:
+            raise RuntimeError('failed to invoke join() method as workflow is not running in detached mode')
+        self.__detached_thread.join(timeout)
+        self.__detached_thread = None
