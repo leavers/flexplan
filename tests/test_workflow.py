@@ -1,6 +1,6 @@
 import time
 import unittest
-import pipegram as pg
+from pipegram.workflow2 import Workflow
 
 
 def a1(*args, **kwargs):
@@ -95,7 +95,7 @@ class TestWorkflow(unittest.TestCase):
         pass
 
     def test_workflow_1(self):
-        wf = pg.Workflow()
+        wf = Workflow()
         wf.add('a1', a1, args=('a1',), kwargs={'value': 'a1'})
         wf.add('a2', a2, args=('a2',), kwargs={'value': 'a2'})
         wf.add('a3', a3, args=('a3',), kwargs={'value': 'a3'})
@@ -112,7 +112,7 @@ class TestWorkflow(unittest.TestCase):
         wf.run()
 
     def test_workflow_2(self):
-        wf = pg.Workflow()
+        wf = Workflow()
         wf.add('a1', a1, args=('a1',), kwargs={'value': 'a1'})
         wf.add('a2', a2, args=('a2',), kwargs={'value': 'a2'}, after={'a1'})
         wf.add('a3', a3, args=('a3',), kwargs={'value': 'a3'}, after={'a2'})
@@ -127,7 +127,7 @@ class TestWorkflow(unittest.TestCase):
         wf.run()
 
     def test_workflow_detached_1(self):
-        wf = pg.Workflow(single_thread_pool=True)
+        wf = Workflow(single_thread_pool=True)
         wf.add('a1', a1, args=('a1',), kwargs={'value': 'a1'})
         wf.add('a2', a2, args=('a2',), kwargs={'value': 'a2'}, after={'a1'})
         wf.add('a3', a3, args=('a3',), kwargs={'value': 'a3'}, after={'a2'})
@@ -139,7 +139,7 @@ class TestWorkflow(unittest.TestCase):
         wf.add('i2', i2, args=('i2',), kwargs={'value': 'i2'})
         wf.add('i3', i3, args=('i3',), kwargs={'value': 'i3'})
         print('Started')
-        result = wf.run_detached()
+        result = wf.start()
         print('Join')
         seconds = 0
         while seconds < 15:
@@ -153,7 +153,7 @@ class TestWorkflow(unittest.TestCase):
         wf.join()
         print(result.get())
         print('Stated again')
-        wf.run_detached()
+        wf.start()
         print('Join again')
         seconds = 0
         while seconds < 15:
@@ -172,7 +172,7 @@ class TestWorkflow(unittest.TestCase):
             elapsed = time.time() - start_time
             print(f'elapsed time: {elapsed}')
 
-        wf = pg.Workflow(single_thread_pool=True)
+        wf = Workflow(single_thread_pool=True)
         wf.add('a1', a1, args=('a1',), kwargs={'value': 'a1'})
         wf.add('a2', a2, args=('a2',), kwargs={'value': 'a2'}, after={'a1'})
         wf.add('a3', a3, args=('a3',), kwargs={'value': 'a3'}, after={'a2'})
@@ -187,7 +187,7 @@ class TestWorkflow(unittest.TestCase):
         wf.run()
 
     def test_workflow_handler_2(self):
-        wf = pg.Workflow(single_thread_pool=True)
+        wf = Workflow(single_thread_pool=True)
         wf.add('a1', a1, args=('a1',), kwargs={'value': 'a1'})
         wf.add('a2', a2, args=('a2',), kwargs={'value': 'a2'}, after={'a1'})
         wf.add('a3', a3, args=('a3',), kwargs={'value': 'a3'}, after={'a2'})
@@ -196,7 +196,7 @@ class TestWorkflow(unittest.TestCase):
         wf.add('b2', b2, args=('b2',), kwargs={'value': 'b2'}, after={'a1', 'a2', 'a3', 'a4', 'b1'})
         wf.add('c1', c1, args=('c1',), kwargs={'value': 'c1'}, after={'a1', 'b1'})
 
-        wf2 = pg.Workflow()
+        wf2 = Workflow()
         wf2.add('i1', i1, args=('i1',), kwargs={'value': 'i1'})
         wf2.add('i2', i2, args=('i2',), kwargs={'value': 'i2'})
         wf2.add('i3', i3, args=('i3',), kwargs={'value': 'i3'})
@@ -211,7 +211,7 @@ class TestWorkflow(unittest.TestCase):
             elapsed = time.time() - start_time
             print(f'elapsed time: {elapsed}')
 
-        wf = pg.Workflow()
+        wf = Workflow()
         wf.add('a1', a1, args=('a1',), kwargs={'value': 'a1'})
 
         global_dict = {'start_time': time.time()}
