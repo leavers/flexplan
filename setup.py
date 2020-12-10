@@ -35,7 +35,7 @@ setup(
     name='pipegram',
     python_requires='>=3.8',
     version=get_version(),
-    url='https://github.com/encode/starlette',
+    url='https://github.com/leavers/pipegram',
     license='MIT',
     description='Create and manage workflow pipelines.',
     long_description=get_readme(),
