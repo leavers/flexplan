@@ -164,9 +164,13 @@ class DependencyChain:
             return
         priority = priority_of[item]
         for p in sup[item]:
-            if p not in priority_of or -2 == priority_of[p]:
-                # Cyclic/orphan items are marked here.
+            priority_p = priority_of.get(p)
+            if priority_p in (None, -4):  # not found
+                priority_of[p] = -4
                 priority_of[item] = -2
+                return
+            elif priority_p in (-2, -3):  # cyclic or normal error
+                priority_of[item] = -2  # FIXME
                 return
             elif priority_of[p] == -1:
                 priority_of[p] = 0
@@ -227,16 +231,20 @@ class DependencyChain:
         return len(self._priority_of)
 
     def not_found_items(self) -> Set[Hashable]:
-        # invalid_items contain all not_found_items
+        return self._get_level(-4)
+
+    def cyclic_items(self) -> Set[Hashable]:
         return self._get_level(-3)
 
-    def invalid_items(self) -> Set[Hashable]:
-        # invalid_items contain all not_found_items
+    def error_dep_items(self) -> Set[Hashable]:
         return self._get_level(-2)
+
+    def invalid_items(self) -> Set[Hashable]:
+        return self._get_level(-2) | self._get_level(-3) | self._get_level(-4)
 
     def independent_items(self) -> Set[Hashable]:
         return self._get_level(-1)
 
     def dependent_items(self) -> Set[Hashable]:
         all_items = set(self._priority_of.keys())
-        return all_items - self._get_level(-2) - self._get_level(-1)
+        return all_items - self.invalid_items() - self.independent_items()
