@@ -173,7 +173,7 @@ class Workflow:
 
         def get(self, name: Hashable = None) -> Union[Dict[Hashable, Any], Any]:
             if name is None:
-                res = dict()
+                res = {}
                 for task_name, task in self._tasks.items():
                     if self.ready(task_name):
                         res[task_name] = task.get()

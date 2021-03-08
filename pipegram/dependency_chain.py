@@ -2,6 +2,11 @@ from typing import Dict, Iterator, Hashable, Iterable, Set
 
 from pipegram.common import Dependent, hashable_types
 
+_NOT_FOUND = -4
+_CYCLE = -3
+_INVALID = -2
+_INDEPENDENT = -1
+
 
 class DependencyChain:
     def __init__(self):
@@ -13,7 +18,7 @@ class DependencyChain:
     def add(self, item: Hashable, after: Dependent = None):
         if item is None:
             raise TypeError('Param "item" should not be None.')
-        if self._priority_of.get(item) not in (None, -3):
+        if self._priority_of.get(item) not in (None, _CYCLE):
             raise ValueError(f'Item "{item}" already exists.')
 
         sup, sub = self._sup_of, self._sub_of
@@ -118,7 +123,7 @@ class DependencyChain:
             sup_set.discard(item)
             sub_set.discard(item)
             if len(sup_set) == 0 and len(sub_set) == 0:
-                priority_of[elem] = -1
+                priority_of[elem] = _INDEPENDENT
         levels = 0
         for priority in priority_of.values():
             if priority >= 0 and priority + 1 > levels:
@@ -126,7 +131,7 @@ class DependencyChain:
         self._levels = levels
 
     def _ignore_priority_of(self, item: Hashable, priority: int):
-        if priority == -1:
+        if priority == _INDEPENDENT:
             return
         priority_of, sup, sub = self._priority_of, self._sup_of, self._sub_of
         item_sup_set, item_sub_set = sup[item], sub[item]
@@ -138,7 +143,7 @@ class DependencyChain:
         self._remove_priority_of(item, item, priority)
 
     def _remove_priority_of(self, item: Hashable, node: Hashable, priority: int):
-        if priority == -1:
+        if priority == _INDEPENDENT:
             return
         priority_of, sup, sub = self._priority_of, self._sup_of, self._sub_of
         for b in sub[node]:
@@ -147,12 +152,12 @@ class DependencyChain:
                 if bp == item:
                     continue
                 temp = priority_of[bp]
-                if temp == -2:
-                    priority_b = -2
+                if temp == _INVALID:
+                    priority_b = _INVALID
                 else:
                     priority_b = max(priority_b, temp + 1)
             if priority_b == 0 and len(sub[b]) == 0:
-                priority_b = -1
+                priority_b = _INDEPENDENT
             priority_of[b] = priority_b
         for b in sub[node]:
             self._remove_priority_of(item, b, priority_of[b])
@@ -160,23 +165,27 @@ class DependencyChain:
     def _add_priority_of(self, item: Hashable):
         priority_of, sup, sub = self._priority_of, self._sup_of, self._sub_of
         if 0 == len(sub[item]) == len(sup[item]):
-            priority_of[item] = -1
+            priority_of[item] = _INDEPENDENT
             return
         priority = priority_of[item]
         for p in sup[item]:
             priority_p = priority_of.get(p)
-            if priority_p in (None, -4):  # not found
-                priority_of[p] = -4
-                priority_of[item] = -2
+            if priority_p in (None, _NOT_FOUND):  # not found
+                priority_of[p] = _NOT_FOUND
+                if priority is None or priority not in (_INVALID, _CYCLE):
+                    priority_of[item] = _INVALID
                 return
-            elif priority_p in (-2, -3):  # cyclic or normal error
-                priority_of[item] = -2  # FIXME
+            elif priority_p in (_INVALID, _CYCLE):  # cyclic or normal error
+                if priority == _NOT_FOUND:
+                    priority_of[item] = _CYCLE
+                else:
+                    priority_of[item] = _INVALID
                 return
-            elif priority_of[p] == -1:
+            elif priority_p == _INDEPENDENT:  # depends on a item which is independent before
                 priority_of[p] = 0
                 priority = max(priority, 1)
             else:
-                priority = max(priority, priority_of[p] + 1)
+                priority = max(priority, priority_p + 1)  # normal dependent item
         priority_of[item] = priority
         self._levels = max(self._levels, priority + 1)
         for b in sub[item]:
@@ -219,11 +228,11 @@ class DependencyChain:
                            enumerate(self.level_items())))
         else:
             res = list()
-        if len((ind := self._get_level(-1))) > 0:
+        if len((ind := self._get_level(_INDEPENDENT))) > 0:
             res.append(f'independent={ind if len(ind) > 0 else "{}"}')
-        if len((ivd := self._get_level(-2))) > 0:
+        if len((ivd := self._get_level(_INVALID))) > 0:
             res.append(f'invalid={ivd if len(ivd) > 0 else "{}"}')
-        if len((nfd := self._get_level(-3))) > 0:
+        if len((nfd := self._get_level(_CYCLE))) > 0:
             res.append(f'not found={nfd if len(nfd) > 0 else "{}"}')
         return ','.join(res)
 
@@ -231,19 +240,19 @@ class DependencyChain:
         return len(self._priority_of)
 
     def not_found_items(self) -> Set[Hashable]:
-        return self._get_level(-4)
+        return self._get_level(_NOT_FOUND)
 
     def cyclic_items(self) -> Set[Hashable]:
-        return self._get_level(-3)
+        return self._get_level(_CYCLE)
 
     def error_dep_items(self) -> Set[Hashable]:
-        return self._get_level(-2)
+        return self._get_level(_INVALID)
 
     def invalid_items(self) -> Set[Hashable]:
-        return self._get_level(-2) | self._get_level(-3) | self._get_level(-4)
+        return self._get_level(_INVALID) | self._get_level(_CYCLE) | self._get_level(_NOT_FOUND)
 
     def independent_items(self) -> Set[Hashable]:
-        return self._get_level(-1)
+        return self._get_level(_INDEPENDENT)
 
     def dependent_items(self) -> Set[Hashable]:
         all_items = set(self._priority_of.keys())

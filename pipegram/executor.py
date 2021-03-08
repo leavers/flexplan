@@ -299,7 +299,7 @@ class _AsyncWorker:
                     curr_coroutines += 1
             except Empty:
                 pass
-            await asyncio.sleep(0)  # ugly but working
+            await asyncio.sleep(0)  # ugly but works
             while not async_response_queue.empty():
                 response: _ActionItem = await async_response_queue.get()
                 await async_tasks.pop(response.work_id)
@@ -997,15 +997,15 @@ class HybridPoolExecutor:
         mode = self._mode_redirects[mode]
         is_async_func = asyncio.iscoroutinefunction(func)
         if is_async_func and mode not in (WORK_MODE_ASYNC, WORK_MODE_LOCAL):
-            mode = WORK_MODE_ASYNC
-            warnings.warn(f'Work {name} is asynchronous but set to be running under '
+            warnings.warn(f'Work "{name}" ({func.__name__}) is asynchronous but set to be running under '
                           f'"{mode}" mode, coercing to "async" mode instead.',
                           RuntimeWarning, stacklevel=2)
+            mode = WORK_MODE_ASYNC
         elif mode == WORK_MODE_ASYNC and not is_async_func:
-            mode = WORK_MODE_THREAD
-            warnings.warn(f'Work {name} is synchronous but set to be running under '
+            warnings.warn(f'Work "{name}" ({func.__name__}) is synchronous but set to be running under '
                           '"async" mode, coercing to "thread" mode instead.',
                           RuntimeWarning, stacklevel=2)
+            mode = WORK_MODE_THREAD
         if mode == WORK_MODE_THREAD:
             self._thread_work_queue.put(call_item)
         elif mode == WORK_MODE_PROCESS:
