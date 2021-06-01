@@ -10,10 +10,7 @@ import warnings
 import weakref
 from dataclasses import dataclass, field
 from queue import SimpleQueue, Empty
-from typing import (
-    Any, Callable, Dict, Hashable, Literal,
-    Optional, Tuple, Union
-)
+from typing import Any, Callable, Dict, Hashable, Optional, Tuple, Union
 from weakref import ReferenceType
 
 from pipegram.common import (
@@ -22,86 +19,6 @@ from pipegram.common import (
     ThreadFallbackMode, ProcessFallbackMode, AsyncFallbackMode,
     MAX_THREADS, MAX_PROCESSES
 )
-
-_manager_threads = weakref.WeakSet()
-_global_shutdown = False
-
-
-# TODO: Add KeyboardInterrupt, SystemExit handler.
-# TODO: Add function signature checker.
-# TODO: Cancel future.
-# TODO: Awaitable future.
-# TODO: Wrap executor class to make workflow be able to use other executor implementations.
-
-# TODO: At-exit handler not reliable
-# Although an at-exit handler is added, it is still not safe to submit tasks and not to wait for their futures:
-# 1. Check the reason of program corruption in "process" mode.
-# 2. Determine whether to force users to wait for futures before program exits.
-@atexit.register
-def _python_exit():
-    global _global_shutdown
-    _global_shutdown = True
-    for t in _manager_threads:
-        t.join()
-
-
-class PollFuture:
-    def __init__(self, name: Hashable):
-        self._name = name
-        self._result: Any = None
-        self._exc: Optional[BaseException] = None
-        self._async_got: asyncio.Event = asyncio.Event()
-        self._got: threading.Event = threading.Event()
-        self._put_s, self._get_s = socket.socketpair()
-
-    @property
-    def name(self):
-        return self._name
-
-    @property
-    def sentinel(self):
-        return self._get_s.fileno()
-
-    @property
-    def result(self):
-        return self._result
-
-    @property
-    def exception(self):
-        return self._exc
-
-    def ready(self) -> bool:
-        return self._got.is_set()
-
-    def get(self):
-        if not self._got.is_set():
-            self._got.wait()
-            self._get_s.recv(1)
-        if self._exc:
-            raise self._exc
-        return self._result
-
-    async def get_async(self):
-        # FIXME: fix notify_async_event() firstly or get_async will block permanently.
-        await self._async_got.wait()
-        return self.get()
-
-    def set_result(
-            self,
-            result: Any = None,
-            exception: BaseException = None
-    ):
-        if self._got.is_set():
-            raise RuntimeError(f'Future result can only be set once.')
-        self._result = result
-        self._exc = exception
-        self._put_s.send(b'1')
-        self._got.set()
-
-    def notify_async_event(self, loop):
-        # FIXME: loop should be initialized in HybridPoolExecutor.__init__
-        asyncio.run_coroutine_threadsafe(self._async_got.set, loop)
-
 
 ACT_NONE = 0
 ACT_DONE = 1
@@ -114,6 +31,25 @@ ACT_CANCEL = 1 << 6
 ACT_COERCE = 1 << 7
 
 ACT_CMD_WORKER_STOP_FLAGS = (ACT_CLOSE, ACT_RESTART)  # used for manager/worker
+
+
+class CancelledError(Exception):
+    pass
+
+
+_manager_threads = weakref.WeakSet()
+_global_shutdown = False
+
+
+# TODO: Wrap executor class to make workflow be able to use other executor implementations.
+# TODO: Add KeyboardInterrupt, SystemExit handler (optional).
+
+@atexit.register
+def _python_exit():
+    global _global_shutdown
+    _global_shutdown = True
+    for t in _manager_threads:
+        t.join()
 
 
 @dataclass
@@ -144,6 +80,91 @@ class _CallItem:
     args: Tuple[Any, ...] = ()
     kwargs: Dict[str, Any] = field(default_factory=dict)
     work_mode: WorkMode = WORK_MODE_THREAD
+    cancelled: bool = False
+
+
+class PollFuture:
+    def __init__(self, name: Hashable, call_item: _CallItem = None):
+        self._name = name
+        self._result: Any = None
+        self._cancelled: Optional[bool] = None
+        self._exc: Optional[BaseException] = None
+        self._loop = asyncio.get_event_loop()
+        self._async_got: asyncio.Event = asyncio.Event()
+        self._got: threading.Event = threading.Event()
+        self._put_s, self._get_s = socket.socketpair()
+        self._call_item_ref = weakref.ref(call_item)
+
+    @property
+    def name(self):
+        return self._name
+
+    @property
+    def sentinel(self):
+        return self._get_s.fileno()
+
+    @property
+    def result(self):
+        return self.get()
+
+    @property
+    def exception(self):
+        return self._exc
+
+    @property
+    def cancelled(self):
+        return self._cancelled
+
+    def cancel(self):
+        if self._cancelled is not None:
+            return self._cancelled
+        if not self.ready():
+            call_item: _CallItem = self._call_item_ref()
+            if call_item:
+                call_item.cancelled = True
+            self._cancelled = True
+        else:
+            self._cancelled = False
+        return self._cancelled
+
+    def ready(self) -> bool:
+        return not self._cancelled and self._got.is_set()
+
+    def get(self):
+        if self._cancelled:
+            raise CancelledError(f'Future "{self._name}" has been cancelled')
+        if not self._got.is_set():
+            self._got.wait()
+            self._get_s.recv(1)
+        if self._exc:
+            raise self._exc
+        return self._result
+
+    async def get_async(self):
+        await self._async_got.wait()
+        return self.get()
+
+    def set_result(
+            self,
+            result: Any = None,
+            exception: BaseException = None
+    ):
+        if self._got.is_set():
+            raise RuntimeError(f'Future result can only be set once.')
+        self._result = result
+        self._exc = exception
+        self._put_s.send(b'1')
+        self.notify_async_event()
+        self._got.set()
+
+    def notify_async_event(self):
+
+        # As run_coroutine_threadsafe only accepts coroutine, we need to wrap event.set()
+        # method into an async function.
+        async def set_async(event):
+            event.set()
+
+        asyncio.run_coroutine_threadsafe(set_async(self._async_got), self._loop)
 
 
 @dataclass
@@ -156,9 +177,9 @@ class _WorkItem:
 @dataclass
 class _AsyncWorkerContext:
     name: Hashable
-    work_queue: SimpleQueue
-    request_queue: SimpleQueue
-    response_queue: SimpleQueue
+    work_queue: SimpleQueue  # SimpleQueue of _CallItem
+    request_queue: SimpleQueue  # SimpleQueue of _ActionItem
+    response_queue: SimpleQueue  # SimpleQueue of _ActionItem
     daemon: bool = True
     idle_timeout: float = 60.0
     wait_interval: float = 0.1
@@ -169,9 +190,9 @@ class _AsyncWorkerContext:
 @dataclass
 class _ThreadWorkerContext:
     name: Hashable
-    work_queue: SimpleQueue
-    request_queue: SimpleQueue
-    response_queue: SimpleQueue
+    work_queue: SimpleQueue  # SimpleQueue of _CallItem
+    request_queue: SimpleQueue  # SimpleQueue of _ActionItem
+    response_queue: SimpleQueue  # SimpleQueue of _ActionItem
     daemon: bool = True
     idle_timeout: float = 60.0
     wait_interval: float = 0.1
@@ -183,9 +204,9 @@ class _ThreadWorkerContext:
 @dataclass
 class _ProcessWorkerContext:
     name: Hashable
-    work_queue: mp.Queue
-    request_queue: mp.Queue
-    response_queue: mp.Queue
+    work_queue: mp.Queue  # Queue of _CallItem
+    request_queue: mp.Queue  # Queue of _ActionItem
+    response_queue: mp.Queue  # Queue of _ActionItem
     process_context: mp.context.BaseContext
     daemon: bool = False
     idle_timeout: float = 60.0
@@ -286,14 +307,24 @@ class _AsyncWorker:
                 while not 0 <= ctx.max_work_count <= work_count:
                     call_item: _CallItem = work_queue.get(timeout=wait_interval)
                     work_id = call_item.name
-                    task: asyncio.Task = asyncio.create_task(
-                        coroutine(async_func=call_item.func,
-                                  args=call_item.args,
-                                  kwargs=call_item.kwargs,
-                                  work_id=work_id,
-                                  worker_id=worker_id,
-                                  async_out=async_response_queue)
-                    )
+                    # Check if future is cancelled
+                    if call_item.cancelled:
+                        response_queue.put(
+                            _ActionItem(action=ACT_EXCEPTION,
+                                        work_id=work_id,
+                                        worker_id=worker_id,
+                                        exception=CancelledError(f'Future "{work_id}" has been cancelled'))
+                        )
+                        continue
+                    else:
+                        task: asyncio.Task = asyncio.create_task(
+                            coroutine(async_func=call_item.func,
+                                      args=call_item.args,
+                                      kwargs=call_item.kwargs,
+                                      work_id=work_id,
+                                      worker_id=worker_id,
+                                      async_out=async_response_queue)
+                        )
                     async_tasks[work_id] = task
                     work_count += 1
                     curr_coroutines += 1
@@ -427,6 +458,9 @@ class _ThreadWorker:
             result = None
             try:
                 enter_response_ctx(call_item.name)
+                # Check if future is cancelled
+                if call_item.cancelled:
+                    raise CancelledError(f'Future "{self._work_id}" has been cancelled')
                 result = call_item.func(*call_item.args, **call_item.kwargs)
             except Exception as exc:
                 err_count += 1
@@ -477,7 +511,7 @@ def _process_worker(
         work_queue: mp.Queue,
         request_queue: mp.Queue,
         response_queue: mp.Queue,
-        exit_flag: mp.Event,
+        idle_flag: mp.Event,
         idle_timeout: float,
         wait_interval: float,
         max_work_count: int,
@@ -512,13 +546,16 @@ def _process_worker(
             break
         while not request_queue.empty():
             request: _ActionItem = request_queue.get()
+            # Clear the idle flag
+            if idle_flag.is_set():
+                idle_flag.clear()
             if request.match(ACT_RESET):
                 work_count = 0
                 err_count = 0
                 cons_err_count = 0
             if request.match(ACT_CMD_WORKER_STOP_FLAGS):
                 response = get_response(ACT_CLOSE)
-                exit_flag.set()
+                idle_flag.clear()  # mark as busy when closing
                 exit_ = True
                 break
         if exit_:
@@ -529,7 +566,13 @@ def _process_worker(
             continue
         result = None
         try:
+            # Clear the idle flag
+            if idle_flag.is_set():
+                idle_flag.clear()
             work_id = call_item.name  # equals to enter_response_ctx
+            # Check if future is cancelled
+            if call_item.cancelled:
+                raise CancelledError(f'Future "{work_id}" has been cancelled')
             result = call_item.func(*call_item.args, **call_item.kwargs)
         except Exception as exc:
             err_count += 1
@@ -547,10 +590,11 @@ def _process_worker(
                     or 0 <= max_err_count < err_count \
                     or 0 <= max_cons_err_count < cons_err_count:
                 response.add_action(ACT_CLOSE)
-                exit_flag.set()
+                idle_flag.clear()  # mark as busy when closing
                 break
             response_queue.put(response)
             response = None
+            idle_flag.set()  # mark as idle when a task is finished
     if response is not None and response.action != ACT_NONE:
         response_queue.put(response)
 
@@ -559,8 +603,16 @@ class _ProcessWorker:
 
     def __init__(self, ctx: _ProcessWorkerContext):
         self.ctx = ctx
-        self._exit = mp.Event()
         self._process: Optional[mp.Process] = None
+
+        # As there is a time interval between start() invoked and got first task from task queue,
+        # _ProcessWorker needs a flag to indicate it is still initializing and "idle", so as to prevent
+        # manager worker from creating redundant process workers.
+        # Also, there is a time interval between stop() invoked and worker deconstructed, _ProcessWorker
+        # needs a flag to tell manager worker when it is safe to omit deconstruction duration and create
+        # another worker
+        self._idle = mp.Event()
+        self._idle.set()
 
     @property
     def sentinel(self):
@@ -568,9 +620,7 @@ class _ProcessWorker:
 
     def idle(self) -> bool:
         # A ProcessWorker should be marked as idle while being constructed and busy while being deconstructed
-        if self._exit.is_set():
-            return False
-        return not self._process.is_alive() if self._process is not None else True
+        return self._idle.is_set()
 
     def start(self):
         if self._process is not None:
@@ -588,7 +638,7 @@ class _ProcessWorker:
                 'work_queue': ctx.work_queue,
                 'request_queue': ctx.request_queue,
                 'response_queue': ctx.response_queue,
-                'exit_flag': self._exit,
+                'idle_flag': self._idle,
                 'idle_timeout': ctx.idle_timeout,
                 'wait_interval': ctx.wait_interval,
                 'max_work_count': ctx.max_work_count,
@@ -598,10 +648,9 @@ class _ProcessWorker:
             daemon=ctx.daemon
         )
         self._process.start()
-        self._exit.clear()
 
     def stop(self):
-        self._exit.set()
+        self._idle.clear()
         if self._process is None:
             return
         if self._process.is_alive():
@@ -648,6 +697,7 @@ def _worker_manager(
         = adjust_process_workers \
         = adjust_async_worker \
         = chaos_error
+    global _global_shutdown
 
     def adjust_iterator(
             workers: Dict[Hashable, Union[_ThreadWorker, _ProcessWorker]],
@@ -787,7 +837,12 @@ def _worker_manager(
         worker_id = response.worker_id
         if response.match(ACT_DONE) or response.match(ACT_EXCEPTION):
             work_item = work_items.pop(work_id)  # get and delete the work from worker_items
-            work_item.future.set_result(response.result, response.exception)
+            # Double check if future is cancelled
+            if work_item.future.cancelled:
+                work_item.future.set_result(result=None,
+                                            exception=CancelledError(f'Future "{work_id}" has been cancelled'))
+            else:
+                work_item.future.set_result(response.result, response.exception)
         if response.match(ACT_CLOSE):
             workers.pop(worker_id)
         elif response.match(ACT_RESTART):
@@ -964,8 +1019,13 @@ class HybridPoolExecutor:
             args: Tuple[Any, ...] = (),
             kwargs: Dict[str, Any] = None,
             name: Hashable = None,
-            mode: WorkMode = WORK_MODE_THREAD
+            mode: WorkMode = None
     ) -> PollFuture:
+        if not mode:
+            if asyncio.iscoroutinefunction(func):
+                mode = WORK_MODE_ASYNC
+            else:
+                mode = WORK_MODE_THREAD
         if mode not in work_modes:
             raise ValueError(f'Unrecognized mode "{mode}".')
         if kwargs is None:
@@ -990,19 +1050,19 @@ class HybridPoolExecutor:
             name: Hashable,
             mode: WorkMode
     ) -> Tuple[_WorkItem, PollFuture]:
-        future = PollFuture(name)
         call_item = _CallItem(name, func, args, kwargs)
+        future = PollFuture(name, call_item)
         work_item = _WorkItem(name, future, call_item)
         self._work_items[name] = work_item
         mode = self._mode_redirects[mode]
         is_async_func = asyncio.iscoroutinefunction(func)
         if is_async_func and mode not in (WORK_MODE_ASYNC, WORK_MODE_LOCAL):
-            warnings.warn(f'Work "{name}" ({func.__name__}) is asynchronous but set to be running under '
+            warnings.warn(f'Work "{name}" ({func.__name__}) is an async function but set to be running under '
                           f'"{mode}" mode, coercing to "async" mode instead.',
                           RuntimeWarning, stacklevel=2)
             mode = WORK_MODE_ASYNC
         elif mode == WORK_MODE_ASYNC and not is_async_func:
-            warnings.warn(f'Work "{name}" ({func.__name__}) is synchronous but set to be running under '
+            warnings.warn(f'Work "{name}" ({func.__name__}) is an async function but set to be running under '
                           '"async" mode, coercing to "thread" mode instead.',
                           RuntimeWarning, stacklevel=2)
             mode = WORK_MODE_THREAD
@@ -1019,11 +1079,20 @@ class HybridPoolExecutor:
     @classmethod
     def _exec_local(cls, call_item: _CallItem, future: PollFuture):
         result = None
+        # Check if future is cancelled
+        if future.cancelled:
+            future.set_result(exception=CancelledError())
+            return
+        # FIXME: RuntimeWarning: coroutine never awaited in 'async' mode due to set_async in notify_async_event
+        # This issue only occurs when mode='local' and is_coroutine == True
         try:
             if asyncio.iscoroutinefunction(call_item.func):
                 result = asyncio.run(call_item.func(*call_item.args, **call_item.kwargs))
             else:
                 result = call_item.func(*call_item.args, **call_item.kwargs)
+            # Double check if future is cancelled
+            if future.cancelled:
+                raise CancelledError(f'Future "{future.name}" has been cancelled')
         except Exception as exc:
             future.set_result(result=result, exception=exc)
         else:
