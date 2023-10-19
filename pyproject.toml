@@ -79,9 +79,6 @@ show_error_codes = true
 # use comment "type: ignore" to ignore single line
 # use comment "type: ignore[error-code] to ignore single error"
 
-[tool.pyright]
-extraPaths = ["__pypackages__/3.8/lib/"]
-
 [tool.pytest.ini_options]
 asyncio_mode = "strict"
 
@@ -93,7 +90,7 @@ authors = [
     {name = "Leavers", email = "leavers930@gmail.com"},
 ]
 requires-python = ">=3.8"
-readme = "README.rst"
+readme = "README.md"
 license = {text = "MIT"}
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -103,6 +100,7 @@ classifiers = [
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
     "Natural Language :: English",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
@@ -111,7 +109,8 @@ classifiers = [
     "Topic :: Software Development",
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
+dependencies = []
 
 [build-system]
-requires = ["pdm-pep517>=1.0"]
-build-backend = "pdm.pep517.api"
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"

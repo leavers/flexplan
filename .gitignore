@@ -220,3 +220,5 @@ gen
 
 # User Customization
 .pdm.toml
+.pdm-python
+.python-version
