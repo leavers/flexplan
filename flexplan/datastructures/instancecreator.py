@@ -1,10 +1,9 @@
 import typing_extensions as t
 
-
 T = t.TypeVar("T")
 
 
-class Initializer(t.Generic[T]):
+class InstanceCreator(t.Generic[T]):
     __slots__ = ("type", "args", "kwargs")
 
     def __init__(
@@ -18,5 +17,5 @@ class Initializer(t.Generic[T]):
         self.args = args
         self.kwargs = kwargs
 
-    def new(self) -> T:
+    def create(self) -> T:
         return self.type(*self.args, **self.kwargs)
