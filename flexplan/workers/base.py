@@ -1,9 +1,13 @@
 import weakref
 from abc import ABC
+from types import TracebackType
 
 import typing_extensions as t
 
 from flexplan.stations.base import Station
+
+if t.TYPE_CHECKING:
+    from flexplan.messages.message import Message
 
 
 @t.final
@@ -15,15 +19,30 @@ class WorkerIntrospection:
         *,
         station: Station,
     ):
-        self._station = weakref.ref(station)
+        self._station = weakref.proxy(station)
 
     @property
     def station(self) -> Station:
-        return self._station()
+        assert self._station is not None
+        return self._station
 
 
 class Worker(ABC):
     def __post_init__(self):
+        ...
+
+    def __enter__(self):
+        ...
+
+    def __exit__(
+        self,
+        exc_type: t.Optional[t.Type[BaseException]],
+        exc_val: t.Optional[BaseException],
+        exc_tb: t.Optional[TracebackType],
+    ) -> None:
+        ...
+
+    def on(self, message: Message):
         ...
 
     @property
