@@ -15,8 +15,8 @@ class ThreadStation(Station):
     def __init__(
         self,
         *,
-        workbench_creator: "InstanceCreator[Workbench]",
-        worker_creator: "InstanceCreator[Worker]",
+        workbench_creator: InstanceCreator[Workbench],
+        worker_creator: InstanceCreator[Worker],
     ):
         super().__init__(
             workbench_creator=workbench_creator,
@@ -59,5 +59,5 @@ class ThreadStation(Station):
         return self._running_event.is_set()
 
     @override
-    def send(self, mail: "Mail") -> None:
+    def send(self, mail: Mail) -> None:
         self._outbox.put(mail)

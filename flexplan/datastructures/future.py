@@ -1,8 +1,24 @@
 from concurrent.futures import Future as BuiltinFuture
+from concurrent.futures._base import FINISHED, _STATE_TO_DESCRIPTION_MAP
+from multiprocessing.managers import SyncManager
 
-from typing_extensions import Any, Generic, Optional, TypeVar
+from typing_extensions import (
+    Any,
+    Callable,
+    Dict,
+    Generic,
+    List,
+    Optional,
+    Tuple,
+    Type,
+    TypeVar,
+)
+
+from flexplan.utils.pickle import get_pickle
+
 
 T = TypeVar("T")
+_pickle = get_pickle()
 
 
 class Future(BuiltinFuture, Generic[T]):
@@ -28,18 +44,18 @@ def _proxy_impl(
     if method_name == "set_result":
 
         def wrapped(self: "ProcessFuture", result: Any):  # type: ignore
-            self._remote.set_result(pickle.dumps(result))
+            self._remote.set_result(_pickle.dumps(result))
             self._invoke_callbacks()  # type: ignore
 
     elif method_name == "result":
 
         def wrapped(  # type: ignore
             self: "ProcessFuture",
-            timeout: t.Optional[float] = None,
+            timeout: Optional[float] = None,
         ):
             try:
                 raw = self._remote.result(timeout=timeout)
-                return pickle.loads(raw)
+                return _pickle.loads(raw)
             finally:
                 self = None  # type: ignore
 
@@ -73,8 +89,8 @@ class ProcessFutureMeta(type):
     def __new__(
         cls,
         name: str,
-        bases: t.Tuple[t.Type, ...],
-        namespace: t.Dict[str, t.Any],
+        bases: Tuple[Type, ...],
+        namespace: Dict[str, Any],
         **kwargs,
     ):
         class_name = namespace["__qualname__"]
@@ -109,7 +125,7 @@ class ProcessFutureMeta(type):
 class ProcessFuture(Future, metaclass=ProcessFutureMeta):
     def __init__(self, remote: Future) -> None:
         self._remote = remote
-        self._done_callbacks: t.List[t.Callable[["ProcessFuture"], t.Any]] = []
+        self._done_callbacks: List[Callable[["ProcessFuture"], Any]] = []
 
     def __repr__(self) -> str:
         # reimplement to avoid calling self._condition and self._state

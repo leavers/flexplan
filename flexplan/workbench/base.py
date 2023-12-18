@@ -1,6 +1,6 @@
-import weakref
 from abc import ABC, abstractmethod
 from sys import _getframe as get_frame
+from weakref import proxy
 
 from typing_extensions import (
     TYPE_CHECKING,
@@ -11,27 +11,31 @@ from typing_extensions import (
 )
 
 if TYPE_CHECKING:
+    from weakref import ProxyType
+
     from flexplan.datastructures.instancecreator import InstanceCreator
-    from flexplan.datastructures.types import QueueLike
+    from flexplan.datastructures.types import EventLike, QueueLike
     from flexplan.messages.mail import Mail
     from flexplan.workers.base import Worker
 
 
 @final
 class WorkbenchContext:
-    def __init__(self, *, worker: "Worker", outbox: "QueueLike") -> None:
-        self._worker_proxy = weakref.proxy(worker)
-        self._outbox_proxy = weakref.proxy(outbox)
+    def __init__(self, *, worker: Worker, outbox: QueueLike) -> None:
+        self.worker_proxy: ProxyType[Worker] = proxy(worker)
+        self.outbox_proxy: ProxyType[QueueLike] = proxy(outbox)
 
-    def invoke(self, mail: "Mail") -> Any:
+    def process(self, mail: Mail) -> Any:
         try:
+            func = mail.message
+            args = mail
             result = func(*args, **kwargs)
         except Exception as e:
             result = e
         return result
 
     @classmethod
-    def search_context(cls, depth: int = 1) -> Optional[Self]:
+    def search_context(cls, depth: int = 2) -> Optional[Self]:
         try:
             frame = get_frame(depth)
         except ValueError:
@@ -52,9 +56,11 @@ class Workbench(ABC):
     def run(
         self,
         *,
-        worker_creator: "InstanceCreator[Worker]",
-        inbox: "QueueLike",
-        outbox: "QueueLike",
+        worker_creator: InstanceCreator[Worker],
+        inbox: QueueLike,
+        outbox: QueueLike,
+        running_event: Optional[EventLike] = None,
+        terminate_event: Optional[EventLike] = None,
         **kwargs,
     ) -> None:
         ...

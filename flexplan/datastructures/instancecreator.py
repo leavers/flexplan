@@ -1,18 +1,29 @@
-import typing_extensions as t
+from ast import Call
+from typing_extensions import (
+    Callable,
+    Generic,
+    ParamSpec,
+    Type,
+    TypeVar,
+    overload,
+)
 
-T = t.TypeVar("T")
+P = ParamSpec("P")
+T = TypeVar("T")
 
 
-class InstanceCreator(t.Generic[T]):
+class InstanceCreator(Generic[T]):
     __slots__ = ("type", "args", "kwargs")
 
-    def __init__(
-        self,
-        __anytype: t.Union[t.Type[T], t.Callable[..., T]],
-        /,
-        *args,
-        **kwargs,
-    ):
+    @overload
+    def __init__(self, __anytype: Type[T], /, *args, **kwargs):
+        ...
+
+    @overload
+    def __init__(self, __anytype: Callable[P, T], /, *args: P.args, **kwargs: P.kwargs):
+        ...
+
+    def __init__(self, __anytype, /, *args, **kwargs):
         self.type = __anytype
         self.args = args
         self.kwargs = kwargs

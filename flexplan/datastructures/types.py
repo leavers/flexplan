@@ -1,172 +1,148 @@
-from abc import abstractmethod, abstractproperty
+from typing_extensions import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    Optional,
+    ParamSpec,
+    Protocol,
+    Self,
+    Tuple,
+    Type,
+    TypeVar,
+)
 
-import typing_extensions as t
-
-if t.TYPE_CHECKING:
+if TYPE_CHECKING:
     from types import TracebackType
 
-P = t.ParamSpec("P")
-T = t.TypeVar("T")
-T_co = t.TypeVar("T_co", covariant=True)
+P = ParamSpec("P")
+T = TypeVar("T")
+T_co = TypeVar("T_co", covariant=True)
 
 
-@t.runtime_checkable
-class EventLike(t.Protocol):
-    @abstractmethod
+class EventLike(Protocol):
     def set(self) -> None:
         ...
 
-    @abstractmethod
     def is_set(self) -> bool:
         ...
 
-    @abstractmethod
     def clear(self) -> None:
         ...
 
-    @abstractmethod
-    def wait(self, timeout: t.Optional[float] = None) -> bool:
+    def wait(self, timeout: Optional[float] = None) -> bool:
         ...
 
 
-@t.runtime_checkable
-class ConditionLike(t.Protocol):
-    @abstractmethod
-    def wait(self, timeout: t.Optional[float] = None) -> bool:
+class ConditionLike(Protocol):
+    def wait(self, timeout: Optional[float] = None) -> bool:
         ...
 
-    @abstractmethod
     def wait_for(
         self,
-        predicate: t.Callable[[], bool],
-        timeout: t.Optional[float] = None,
+        predicate: Callable[[], bool],
+        timeout: Optional[float] = None,
     ) -> bool:
         ...
 
-    @abstractmethod
     def notify(self, n: int = 1) -> None:
         ...
 
-    @abstractmethod
     def notify_all(self) -> None:
         ...
 
-    @abstractmethod
     def __enter__(self) -> bool:
         ...
 
-    @abstractmethod
     def __exit__(
         self,
-        exc_type: t.Optional[t.Type[BaseException]],
-        exc_val: t.Optional[BaseException],
-        exc_tb: t.Optional["TracebackType"],
+        exc_type: Optional[Type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[TracebackType],
     ) -> None:
         ...
 
 
-@t.runtime_checkable
-class SemaphoreLike(t.Protocol):
-    @abstractmethod
+class SemaphoreLike(Protocol):
     def acquire(
         self,
         blocking: bool = True,
-        timeout: t.Optional[float] = None,
+        timeout: Optional[float] = None,
     ) -> bool:
         ...
 
-    @abstractmethod
     def release(self) -> None:
         ...
 
-    @abstractmethod
     def __enter__(self) -> bool:
         ...
 
-    @abstractmethod
     def __exit__(
         self,
-        exc_type: t.Optional[t.Type[BaseException]],
-        exc_val: t.Optional[BaseException],
-        exc_tb: t.Optional["TracebackType"],
+        exc_type: Optional[Type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[TracebackType],
     ) -> None:
         ...
 
 
-@t.runtime_checkable
-class LockLike(t.Protocol):
-    @abstractmethod
+class LockLike(Protocol):
     def acquire(self, *args, **kwargs) -> bool:
         ...
 
-    @abstractmethod
     def release(self) -> None:
         ...
 
-    @abstractmethod
     def __enter__(self) -> bool:
         ...
 
-    @abstractmethod
     def __exit__(
         self,
-        exc_type: t.Optional[t.Type[BaseException]],
-        exc_val: t.Optional[BaseException],
-        exc_tb: t.Optional[TracebackType],
+        exc_type: Optional[Type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[TracebackType],
     ) -> None:
         ...
 
 
-@t.runtime_checkable
-class SimpleQueueLike(t.Protocol[T]):
-    @abstractmethod
+class SimpleQueueLike(Protocol[T]):
     def get(self) -> T:
         ...
 
-    @abstractmethod
     def put(self, obj: T) -> None:
         ...
 
-    @abstractmethod
     def empty(self) -> bool:
         ...
 
 
-@t.runtime_checkable
-class QueueLike(SimpleQueueLike, t.Protocol[T]):
-    @abstractmethod
-    def get(self, block: bool = ..., timeout: t.Optional[float] = ...) -> T:
+class QueueLike(SimpleQueueLike, Protocol[T]):
+    def get(self, block: bool = ..., timeout: Optional[float] = ...) -> T:
         ...
 
-    @abstractmethod
     def get_nowait(self) -> T:
         ...
 
-    @abstractmethod
     def put(
         self,
         obj: T,
         block: bool = ...,
-        timeout: t.Optional[float] = ...,
+        timeout: Optional[float] = ...,
     ) -> None:
         ...
 
-    @abstractmethod
     def put_nowait(self, obj: T) -> None:
         ...
 
-    @abstractmethod
     def empty(self) -> bool:
         ...
 
-    @abstractmethod
     def qsize(self) -> int:
         ...
 
 
-@t.runtime_checkable
-class ValueLike(t.Protocol[T]):
-    @abstractproperty
+class ValueLike(Protocol[T]):
+    @property
     def value(self) -> T:
         ...
 
@@ -175,75 +151,67 @@ class ValueLike(t.Protocol[T]):
         ...
 
 
-@t.runtime_checkable
-class ParallelTask(t.Protocol):
+class ParallelTask(Protocol):
     def __init__(
         self,
-        target: t.Optional[t.Callable[..., t.Any]] = ...,
-        args: t.Tuple[t.Any, ...] = (),
-        kwargs: t.Optional[t.Dict[str, t.Any]] = ...,
-        daemon: t.Optional[bool] = ...,
+        target: Optional[Callable[..., Any]] = ...,
+        args: Tuple[Any, ...] = (),
+        kwargs: Optional[Dict[str, Any]] = ...,
+        daemon: Optional[bool] = ...,
         **more,
     ) -> None:
         ...
 
-    @abstractmethod
     def start(self) -> None:
         ...
 
-    @abstractmethod
-    def join(self, timeout: t.Optional[float] = ...) -> None:
+    def join(self, timeout: Optional[float] = ...) -> None:
         ...
 
-    @abstractmethod
     def is_alive(self) -> bool:
         ...
 
 
-@t.runtime_checkable
-class FutureLike(t.Protocol[T]):
-    @abstractmethod
+class FutureLike(Protocol[T]):
     def cancel(self) -> bool:
         ...
 
-    @abstractmethod
     def cancelled(self) -> bool:
         ...
 
-    @abstractmethod
     def running(self) -> bool:
         ...
 
-    @abstractmethod
     def done(self) -> bool:
         ...
 
-    @abstractmethod
-    def add_done_callback(self, fn: t.Callable[[t.Self], t.Any]) -> None:
+    def add_done_callback(self, fn: Callable[[Self], Any]) -> None:
         ...
 
-    @abstractmethod
-    def result(self, timeout: t.Optional[float] = None) -> T:
+    def result(self, timeout: Optional[float] = None) -> T:
         ...
 
-    @abstractmethod
-    def exception(self, timeout: t.Optional[float] = None) -> t.Optional[BaseException]:
+    def exception(self, timeout: Optional[float] = None) -> Optional[BaseException]:
         ...
 
-    @abstractmethod
     def set_running_or_notify_cancel(self) -> bool:
         ...
 
-    @abstractmethod
     def set_result(self, result: T) -> None:
         ...
 
-    @abstractmethod
     def set_exception(self, exception: BaseException) -> None:
         ...
 
 
-@t.runtime_checkable
-class BoundMethodLike(t.Protocol[T]):
+class BoundMethodLike(Protocol[T]):
     __name__: str
     __self__: T
+
+
+class PickleLike(Protocol):
+    def loads(self, data: bytes) -> Any:
+        ...
+
+    def dumps(self, obj: Any) -> bytes:
+        ...

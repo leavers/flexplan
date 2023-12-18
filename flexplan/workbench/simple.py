@@ -1,14 +1,19 @@
 from queue import Empty
 
-from flexplan.workbench.base import AnyQueue, Workbench
+from typing_extensions import TYPE_CHECKING
+
+from flexplan.workbench.base import Workbench
+
+if TYPE_CHECKING:
+    from flexplan.datastructures.types import QueueLike
 
 
 class SimpleWorkbench(Workbench):
     def run(
         self,
         *,
-        inbox: AnyQueue,
-        outbox: AnyQueue,
+        inbox: QueueLike,
+        outbox: QueueLike,
         **kwargs,
     ) -> None:
         while True:

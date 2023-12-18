@@ -1,16 +1,10 @@
 from typing_extensions import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing_extensions import Any, Protocol
+    from flexplan.datastructures.types import PickleLike
 
-    class PickleLike(Protocol):
-        def loads(self, data: bytes) -> Any:
-            ...
 
-        def dumps(self, obj: Any) -> bytes:
-            ...
-
-def get_pickle(*preferences: str) -> "PickleLike":
+def get_pickle(*preferences: str) -> PickleLike:
     if len(preferences) == 0:
         preferences = ("cloudpickle", "dill", "pickle")
     if len(preferences) == 1:

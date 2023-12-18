@@ -1,9 +1,14 @@
+from dis import Instruction
 from typing_extensions import (
     TYPE_CHECKING,
+    Any,
     Callable,
+    Dict,
     FrozenSet,
     List,
     Optional,
+    Self,
+    Sequence,
     Type,
     final,
 )
@@ -13,27 +18,13 @@ if TYPE_CHECKING:
 
     from flexplan.datastructures.uniqueid import UniqueID
     from flexplan.messages.message import Message
+    from flexplan.workbench.base import WorkbenchContext
 
 
 @final
 class ContactInfo:
-    __slots__ = ("worker_cls", "tags", "actor_id")
-
-    def __init__(
-        self,
-        worker_cls: Type,
-        tags: FrozenSet[str],
-        actor_id: Optional["UniqueID"] = None,
-    ) -> None:
-        self.worker_cls = worker_cls
-        self.tags = tags
-        self.actor_id = actor_id
-
-    def __repr__(self) -> str:
-        return (
-            f"<{self.__class__.__name__} at {hex(id(self))} "
-            f"actor_cls={self.worker_cls} tags={self.tags} actor_id={self.actor_id}>"
-        )
+    # TODO
+    ...
 
 
 @final
@@ -52,30 +43,65 @@ class MailTrace:
 
 @final
 class MailMeta:
-    __slots__ = ("source", "target", "trace")
+    __slots__ = ("sender", "receivers", "trace")
 
     def __init__(
         self,
         *,
-        source: ContactInfo,
-        target: ContactInfo,
+        sender: ContactInfo,
+        receivers: List[ContactInfo],
         trace: Optional[List[MailTrace]] = None,
     ):
-        self.source = source
-        self.target = target
+        self.sender = sender
+        self.receivers = receivers
         self.trace = trace or []
 
 
 @final
 class Mail:
-    __slots__ = ("message", "future", "extra")
+    __slots__ = ("instruction", "args", "kwargs", "future", "meta")
 
     def __init__(
         self,
-        message: "Message",
+        instruction,
+        *,
+        args: Sequence[Any] = (),
+        kwargs: Optional[Dict[str, Any]] = None,
+        meta: MailMeta,
         future: Optional["Future"] = None,
-        extra: Optional[MailMeta] = None,
     ) -> None:
-        self.message = message
+        self.instruction = instruction
+        self.args = tuple(args)
+        if kwargs is None:
+            kwargs = {}
+        self.kwargs = dict(kwargs)
         self.future = future
-        self.extra = extra
+        self.meta = meta
+
+    @classmethod
+    def new(
+        cls,
+        *,
+        message: Message,
+        context: WorkbenchContext,
+        future: Optional[Future] = None,
+    ) -> Self:
+        args = message.args
+        if args is None:
+            args = ()
+        kwargs = message.kwargs
+        if kwargs is None:
+            kwargs = {}
+
+        return cls(
+            instruction=message.instruction,
+            args=args,
+            kwargs=kwargs,
+            # TODO
+            meta=MailMeta(
+                sender=ContactInfo(),
+                receivers=[ContactInfo()],
+                trace=[],
+            ),
+            future=future,
+        )
