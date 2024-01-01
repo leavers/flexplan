@@ -1,7 +1,18 @@
 from functools import cached_property, partial
 from inspect import getmodule, getmro, isbuiltin, isfunction, ismethod
 
-from typing_extensions import Any, Callable, Optional, ParamSpec, Self, Type, TypeVar
+from typing_extensions import Any, Callable, Optional, Type, TypeVar
+
+__all__ = (
+    "getmethodclass",
+    "getmodule",
+    "getmro",
+    "isbuiltin",
+    "isfunction",
+    "ismethod",
+    "ispartial",
+    "ispartialmethod",
+)
 
 T = TypeVar("T")
 
@@ -14,6 +25,7 @@ def ispartialmethod(obj: Any) -> bool:
     return hasattr(obj, "_partialmethod") and callable(
         getattr(obj._partialmethod, "func", None)
     )
+
 
 _warn_nested_class = False
 

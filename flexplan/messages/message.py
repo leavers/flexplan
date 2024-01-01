@@ -60,7 +60,7 @@ class Message:
         context = WorkbenchContext.search_context(2)
         if context is None:
             raise RuntimeError("Message should be sent from a running Worker")
-        outbox = context.outbox_proxy
+        outbox = context.outbox_ref()
         if outbox is None:
             raise RuntimeError("Worker context is corrupted")
 

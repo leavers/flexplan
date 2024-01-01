@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from trace import Trace
 from types import TracebackType
 
 from typing_extensions import TYPE_CHECKING, Optional, Self, Type
@@ -15,8 +14,8 @@ class Station(ABC):
     def __init__(
         self,
         *,
-        workbench_creator: InstanceCreator[Workbench],
-        worker_creator: InstanceCreator[Worker],
+        workbench_creator: "InstanceCreator[Workbench]",
+        worker_creator: "InstanceCreator[Worker]",
     ):
         self._workbench_creator = workbench_creator
         self._worker_creator = worker_creator
@@ -46,5 +45,5 @@ class Station(ABC):
         ...
 
     @abstractmethod
-    def send(self, mail: Mail) -> None:
+    def send(self, mail: "Mail") -> None:
         ...

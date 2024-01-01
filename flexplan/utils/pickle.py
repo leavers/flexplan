@@ -4,7 +4,7 @@ if TYPE_CHECKING:
     from flexplan.datastructures.types import PickleLike
 
 
-def get_pickle(*preferences: str) -> PickleLike:
+def get_pickle(*preferences: str) -> "PickleLike":
     if len(preferences) == 0:
         preferences = ("cloudpickle", "dill", "pickle")
     if len(preferences) == 1:

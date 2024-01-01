@@ -42,7 +42,7 @@ class Worker(ABC):
     ) -> None:
         ...
 
-    def on(self, message: Message):
+    def on(self, message: "Message"):
         ...
 
     @property

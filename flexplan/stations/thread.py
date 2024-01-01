@@ -15,8 +15,8 @@ class ThreadStation(Station):
     def __init__(
         self,
         *,
-        workbench_creator: InstanceCreator[Workbench],
-        worker_creator: InstanceCreator[Worker],
+        workbench_creator: "InstanceCreator[Workbench]",
+        worker_creator: "InstanceCreator[Worker]",
     ):
         super().__init__(
             workbench_creator=workbench_creator,
@@ -50,7 +50,7 @@ class ThreadStation(Station):
     def stop(self):
         if not self._invoked or self._thread is None:
             return
-        self._outbox.put(None)
+        self._inbox.put(None)
         self._thread.join()
         self._thread = None
 
@@ -59,5 +59,5 @@ class ThreadStation(Station):
         return self._running_event.is_set()
 
     @override
-    def send(self, mail: Mail) -> None:
-        self._outbox.put(mail)
+    def send(self, mail: "Mail") -> None:
+        self._inbox.put(mail)

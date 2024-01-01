@@ -58,7 +58,7 @@ class ConditionLike(Protocol):
         self,
         exc_type: Optional[Type[BaseException]],
         exc_val: Optional[BaseException],
-        exc_tb: Optional[TracebackType],
+        exc_tb: "Optional[TracebackType]",
     ) -> None:
         ...
 
@@ -81,7 +81,7 @@ class SemaphoreLike(Protocol):
         self,
         exc_type: Optional[Type[BaseException]],
         exc_val: Optional[BaseException],
-        exc_tb: Optional[TracebackType],
+        exc_tb: "Optional[TracebackType]",
     ) -> None:
         ...
 
@@ -100,7 +100,7 @@ class LockLike(Protocol):
         self,
         exc_type: Optional[Type[BaseException]],
         exc_val: Optional[BaseException],
-        exc_tb: Optional[TracebackType],
+        exc_tb: "Optional[TracebackType]",
     ) -> None:
         ...
 

@@ -7,8 +7,9 @@ class Tester(Worker):
 
 
 def test_thread_station():
+    from flexplan.datastructures.future import Future
     from flexplan.datastructures.instancecreator import InstanceCreator
-    from flexplan.messages.mail import Mail, MailMeta
+    from flexplan.messages.mail import ContactInfo, Mail, MailMeta
     from flexplan.stations.thread import ThreadStation
     from flexplan.workbench.loop import LoopWorkbench
 
@@ -18,9 +19,17 @@ def test_thread_station():
     )
     station.start()
 
+    future: Future = Future()
     mail = Mail(
         Tester.echo,
         args=("message",),
+        meta=MailMeta(
+            sender=ContactInfo(),
+            receivers=[],
+        ),
+        future=future,
     )
-    station.send()
+    station.send(mail)
     station.stop()
+    print("wait")
+    print(future.result())

@@ -1,5 +1,6 @@
 from typing_extensions import Self
 
+
 class Plan:
     def __init__(self):
         pass

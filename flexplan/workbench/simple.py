@@ -5,15 +5,15 @@ from typing_extensions import TYPE_CHECKING
 from flexplan.workbench.base import Workbench
 
 if TYPE_CHECKING:
-    from flexplan.datastructures.types import QueueLike
+    from flexplan.messages.mail import MailBox
 
 
 class SimpleWorkbench(Workbench):
     def run(
         self,
         *,
-        inbox: QueueLike,
-        outbox: QueueLike,
+        inbox: "MailBox",
+        outbox: "MailBox",
         **kwargs,
     ) -> None:
         while True:

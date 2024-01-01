@@ -1,22 +1,20 @@
-from dis import Instruction
 from typing_extensions import (
     TYPE_CHECKING,
     Any,
     Callable,
     Dict,
-    FrozenSet,
     List,
     Optional,
     Self,
     Sequence,
-    Type,
     final,
 )
+
+from flexplan.datastructures.types import QueueLike
 
 if TYPE_CHECKING:
     from concurrent.futures import Future
 
-    from flexplan.datastructures.uniqueid import UniqueID
     from flexplan.messages.message import Message
     from flexplan.workbench.base import WorkbenchContext
 
@@ -82,9 +80,9 @@ class Mail:
     def new(
         cls,
         *,
-        message: Message,
-        context: WorkbenchContext,
-        future: Optional[Future] = None,
+        message: "Message",
+        context: "WorkbenchContext",
+        future: "Optional[Future]" = None,
     ) -> Self:
         args = message.args
         if args is None:
@@ -105,3 +103,6 @@ class Mail:
             ),
             future=future,
         )
+
+
+MailBox = QueueLike[Mail]
