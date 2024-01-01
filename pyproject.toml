@@ -1,10 +1,10 @@
 [project]
 name = "flexplan"
 description = "Execute multiple tasks in an organized parallel manner"
-authors = [{name = "Leavers"}]
+authors = [{ name = "Leavers" }]
 requires-python = ">=3.8"
 readme = "README.md"
-license = {text = "MIT"}
+license = { text = "MIT" }
 classifiers = [
   "Intended Audience :: Developers",
   "License :: OSI Approved :: MIT License",
@@ -21,9 +21,7 @@ classifiers = [
   "Topic :: Software Development :: Libraries :: Python Modules",
   "Topic :: Utilities",
 ]
-dependencies = [
-    "typing-extensions>=4.8.0",
-]
+dependencies = ["flexexecutor", "typing-extensions>=4.8.0"]
 dynamic = ["version"]
 
 [project.urls]
