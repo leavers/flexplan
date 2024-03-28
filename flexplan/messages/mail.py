@@ -16,7 +16,6 @@ if TYPE_CHECKING:
     from concurrent.futures import Future
 
     from flexplan.messages.message import Message
-    from flexplan.workbench.base import WorkbenchContext
 
 
 @final
@@ -77,13 +76,7 @@ class Mail:
         self.meta = meta
 
     @classmethod
-    def new(
-        cls,
-        *,
-        message: "Message",
-        context: "WorkbenchContext",
-        future: "Optional[Future]" = None,
-    ) -> Self:
+    def new(cls, *, message: "Message", future: "Optional[Future]" = None) -> Self:
         args = message.args
         if args is None:
             args = ()

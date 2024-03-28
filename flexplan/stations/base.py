@@ -19,6 +19,7 @@ class Station(ABC):
     ):
         self._workbench_creator = workbench_creator
         self._worker_creator = worker_creator
+        self._worker_class = worker_creator.type
 
     @abstractmethod
     def start(self) -> None:
@@ -47,3 +48,7 @@ class Station(ABC):
     @abstractmethod
     def send(self, mail: "Mail") -> None:
         ...
+
+    @property
+    def worker_class(self) -> "Type[Worker]":
+        return self._worker_class

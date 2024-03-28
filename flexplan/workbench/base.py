@@ -2,15 +2,7 @@ from abc import ABC, abstractmethod
 from sys import _getframe as get_frame
 from weakref import ref
 
-from typing_extensions import (
-    TYPE_CHECKING,
-    Any,
-    Callable,
-    Optional,
-    Self,
-    Type,
-    final,
-)
+from typing_extensions import TYPE_CHECKING, Any, Optional, Self, Type
 
 from flexplan.utils.inspect import getmethodclass
 
@@ -23,7 +15,6 @@ if TYPE_CHECKING:
     from flexplan.workers.base import Worker
 
 
-@final
 class WorkbenchContext:
     def __init__(self, *, worker: "Worker", outbox: "MailBox") -> None:
         self.worker_ref: "ReferenceType[Worker]" = ref(worker)
@@ -36,12 +27,12 @@ class WorkbenchContext:
             return
         worker.__post_init__()
 
-    def process(self, mail: "Mail") -> Any:
+    def handle(self, mail: "Mail") -> Any:
         try:
             instruction = mail.instruction
             if isinstance(instruction, str):
                 raise NotImplementedError()
-            elif isinstance(instruction, Callable):
+            elif callable(instruction):
                 cls = getmethodclass(instruction)
                 if cls is not self.worker_cls:
                     raise ValueError(
@@ -52,7 +43,7 @@ class WorkbenchContext:
                     mail.future.set_result(result)
                 return result
             else:
-                raise ValueError(f"{instruction!r} is not a callable")
+                raise ValueError(f"{instruction!r} is not callable")
         except Exception as exc:
             if mail.future:
                 mail.future.set_exception(exc)

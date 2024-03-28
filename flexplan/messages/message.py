@@ -46,13 +46,13 @@ class Message:
         self.kwargs = kwargs
         return self
 
-    def submit(self) -> Future:
+    def submit(self) -> "Future":
         return self._send(use_future=True)  # type: ignore[return-value]
 
     def dispatch(self) -> None:
         self._send(use_future=False)
 
-    def _send(self, use_future: bool) -> Optional[Future]:
+    def _send(self, use_future: bool) -> "Optional[Future]":
         from flexplan.datastructures.future import Future
         from flexplan.messages.mail import Mail
         from flexplan.workbench.base import WorkbenchContext
@@ -68,10 +68,6 @@ class Message:
             future: Optional[Future] = Future()
         else:
             future = None
-        mail = Mail.new(
-            message=self,
-            context=context,
-            future=future,
-        )
+        mail = Mail.new(message=self, future=future)
         outbox.put(mail)
         return future

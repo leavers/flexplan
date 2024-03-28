@@ -1,8 +1,6 @@
 from uuid import UUID, uuid4
 
-
 import typing_extensions as t
-
 
 __all__ = (
     "UniqueID",

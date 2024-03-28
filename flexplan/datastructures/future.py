@@ -1,5 +1,5 @@
 from concurrent.futures import Future as BuiltinFuture
-from concurrent.futures._base import FINISHED, _STATE_TO_DESCRIPTION_MAP
+from concurrent.futures._base import _STATE_TO_DESCRIPTION_MAP, FINISHED
 from multiprocessing.managers import SyncManager
 
 from typing_extensions import (
@@ -14,11 +14,7 @@ from typing_extensions import (
     TypeVar,
 )
 
-from flexplan.utils.pickle import get_pickle
-
-
 T = TypeVar("T")
-_pickle = get_pickle()
 
 
 class Future(BuiltinFuture, Generic[T]):
@@ -41,6 +37,10 @@ def _proxy_impl(
     module_name: str,
     invoke_callback: bool,
 ):
+    from flexplan.utils.pickle import get_pickle
+
+    _pickle = get_pickle()
+
     if method_name == "set_result":
 
         def wrapped(self: "ProcessFuture", result: Any):  # type: ignore

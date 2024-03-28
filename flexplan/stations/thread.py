@@ -2,6 +2,7 @@ from queue import Queue
 from threading import Event, Thread
 
 from typing_extensions import TYPE_CHECKING, Optional, override
+
 from flexplan.stations.base import Station
 
 if TYPE_CHECKING:
