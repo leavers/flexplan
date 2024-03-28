@@ -7,7 +7,7 @@ from nox.command import CommandFailed
 PYTHON_BASE_VERSION = "3.8"
 PYTHON_VERSIONS = ("3.8", "3.9", "3.10", "3.11", "3.12")
 AUTOFLAKE_VERSION = "2.2.1"
-RUFF_VERSION = "0.1.9"
+RUFF_VERSION = "0.2.2"
 MYPY_VERSION = "1.8.0"
 BUILD_VERSION = "1.0.3"
 TWINE_VERSION = "4.0.2"
@@ -76,13 +76,23 @@ def format(session: Session, autoflake: str, ruff: str):
     session.run("autoflake", "--version")
     session.run("autoflake", SOURCE_DIR, NOXFILE_PATH, TEST_DIR)
     session.run("ruff", "--version")
+    session.run(
+        "ruff",
+        "check",
+        "--select",
+        "I",
+        "--fix",
+        SOURCE_DIR,
+        NOXFILE_PATH,
+        TEST_DIR,
+    )
     session.run("ruff", "format", SOURCE_DIR, NOXFILE_PATH, TEST_DIR)
 
 
 @nox.session(python=PYTHON_BASE_VERSION, reuse_venv=True)
 @nox.parametrize("autoflake", [AUTOFLAKE_VERSION])
 @nox.parametrize("ruff", [RUFF_VERSION])
-def format_check(session: Session, autoflake: str, ruff: str):
+def lint(session: Session, autoflake: str, ruff: str):
     session.install(
         f"autoflake~={autoflake}",
         f"ruff~={ruff}",
@@ -98,6 +108,16 @@ def format_check(session: Session, autoflake: str, ruff: str):
     session.run("autoflake", "--version")
     session.run("autoflake", "--check-diff", SOURCE_DIR, NOXFILE_PATH, TEST_DIR)
     session.run("ruff", "--version")
+    session.run(
+        "ruff",
+        "check",
+        "--select",
+        "I",
+        "--diff",
+        SOURCE_DIR,
+        NOXFILE_PATH,
+        TEST_DIR,
+    )
     session.run(
         "ruff",
         "format",

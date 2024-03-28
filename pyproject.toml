@@ -33,7 +33,6 @@ homepage = "https://github.com/leavers/flexplan"
 dev = [
   "autoflake",
   "bumpver",
-  "isort",
   "mypy",
   "nox",
   "pytest",
