@@ -98,10 +98,6 @@ parallel = true
 show_missing = true
 exclude_lines = ["pragma: nocover"]
 
-[tool.isort]
-# Seems that `ruff format` doesn't support `isort` yet
-profile = "black"
-
 [tool.mypy]
 check_untyped_defs = true
 ignore_missing_imports = true
@@ -114,3 +110,4 @@ asyncio_mode = "strict"
 
 [tool.ruff]
 line-length = 88
+target-version = "py38"
