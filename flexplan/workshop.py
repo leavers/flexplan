@@ -6,25 +6,26 @@ from typing_extensions import (
     List,
     Optional,
     ParamSpec,
-    Self,
     Type,
     TypeVar,
     Union,
+    cast,
     overload,
 )
 
 from flexplan.datastructures.future import Future
-from flexplan.datastructures.instancecreator import InstanceCreator
+from flexplan.datastructures.instancecreator import Creator, InstanceCreator
 from flexplan.stations.base import Station
 from flexplan.stations.thread import ThreadStation
 from flexplan.supervisor import Supervisor, SupervisorWorkbench
+from flexplan.utils.identity import gen_worker_id
 from flexplan.workbench.base import Workbench
 from flexplan.workbench.loop import LoopWorkbench
 from flexplan.workers.base import Worker
 
 if TYPE_CHECKING:
     from flexplan.messages.message import Message
-    from flexplan.types import StationSpec
+    from flexplan.types import WorkerSpec
 
 
 P = ParamSpec("P")
@@ -35,31 +36,31 @@ class Workshop(ThreadStation):
     def __init__(self):
         super().__init__(
             workbench_creator=InstanceCreator(SupervisorWorkbench),
-            worker_creator=InstanceCreator(Supervisor, station_specs=[]),
+            worker_creator=InstanceCreator(Supervisor).bind(worker_specs=[]),
         )
 
     def register(
         self,
-        worker: Union[Type[Worker], InstanceCreator[Worker]],
+        worker: Union[Type[Worker], Creator[Worker]],
         name: Optional[str] = None,
         *,
-        workbench: Optional[Union[Type[Workbench], InstanceCreator[Workbench]]] = None,
-        station: Optional[Union[Type[Station], InstanceCreator[Station]]] = None,
-    ) -> Self:
+        workbench: Optional[Union[Type[Workbench], Creator[Workbench]]] = None,
+        station: Optional[Union[Type[Station], Creator[Station]]] = None,
+    ) -> str:
         if name is not None:
             if not isinstance(name, str):
                 raise TypeError(f"Unexpected name type: {type(name)}")
             elif not name:
                 raise ValueError("Name must be non-empty string")
 
-        worker_creator: InstanceCreator[Worker]
-        workbench_creator: InstanceCreator[Workbench]
-        station_creator: InstanceCreator[Station]
+        worker_creator: Creator[Worker]
+        workbench_creator: Creator[Workbench]
+        station_creator: Creator[Station]
 
         if isinstance(worker, InstanceCreator):
             worker_creator = worker
-        elif issubclass(worker, Worker):
-            worker_creator = InstanceCreator(worker)
+        elif issubclass(wk_t := cast(Type[Worker], worker), Worker):
+            worker_creator = InstanceCreator(wk_t)
         else:
             raise TypeError(f"Unexpected worker type: {type(worker)}")
 
@@ -67,16 +68,15 @@ class Workshop(ThreadStation):
             workbench_creator = InstanceCreator(LoopWorkbench)
         elif isinstance(workbench, InstanceCreator):
             workbench_creator = workbench
-        elif issubclass(workbench, Workbench):
-            workbench_creator = InstanceCreator(workbench)  # type: ignore[assignment]
+        elif issubclass(wb_t := cast(Type[Workbench], workbench), Workbench):
+            workbench_creator = InstanceCreator(wb_t)
         else:
             raise TypeError(f"Unexpected workbench type: {type(workbench)}")
 
         if station is None:
-            station_creator = InstanceCreator(
-                ThreadStation,
-                worker_creator=worker_creator,
+            station_creator = InstanceCreator(ThreadStation).bind(
                 workbench_creator=workbench_creator,
+                worker_creator=worker_creator,
             )
         elif isinstance(station, InstanceCreator):
             kwargs = station.kwargs
@@ -87,18 +87,18 @@ class Workshop(ThreadStation):
             kwargs["worker_creator"] = worker_creator
             kwargs["workbench_creator"] = workbench_creator
             station_creator = station
-        elif issubclass(station, Station):
-            station_creator = InstanceCreator(
-                station,
-                worker_creator=worker_creator,
+        elif issubclass(st_t := cast(Type[Station], station), Station):
+            station_creator = InstanceCreator(st_t).bind(
                 workbench_creator=workbench_creator,
+                worker_creator=worker_creator,
             )
         else:
             raise TypeError(f"Unexpected station type: {type(station)}")
 
-        station_specs: List[StationSpec] = self._worker_creator.kwargs["station_specs"]
-        station_specs.append((name, station_creator))
-        return self
+        worker_id = gen_worker_id()
+        worker_specs: List[WorkerSpec] = self._worker_creator.kwargs["worker_specs"]
+        worker_specs.append((worker_id, name, station_creator))
+        return worker_id
 
     @overload
     def submit(

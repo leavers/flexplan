@@ -46,8 +46,6 @@ pylsp = [
   "pylsp-mypy",
   "pylsp-rope",
   "python-lsp-ruff",
-  "pyls-isort",
-  "python-lsp-black",
 ]
 
 [build-system]

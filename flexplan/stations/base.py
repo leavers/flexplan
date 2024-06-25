@@ -4,7 +4,7 @@ from types import TracebackType
 from typing_extensions import TYPE_CHECKING, Optional, Self, Type
 
 if TYPE_CHECKING:
-    from flexplan.datastructures.instancecreator import InstanceCreator
+    from flexplan.datastructures.instancecreator import Creator, InstanceCreator
     from flexplan.messages.mail import Mail
     from flexplan.workbench.base import Workbench
     from flexplan.workers.base import Worker
@@ -14,8 +14,8 @@ class Station(ABC):
     def __init__(
         self,
         *,
-        workbench_creator: "InstanceCreator[Workbench]",
-        worker_creator: "InstanceCreator[Worker]",
+        workbench_creator: "Creator[Workbench]",
+        worker_creator: "Creator[Worker]",
     ):
         self._workbench_creator = workbench_creator
         self._worker_creator = worker_creator
@@ -30,7 +30,8 @@ class Station(ABC):
         ...
 
     def __enter__(self) -> Self:
-        self.start()
+        if not self.is_running():
+            self.start()
         return self
 
     def __exit__(

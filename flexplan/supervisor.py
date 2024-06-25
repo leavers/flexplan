@@ -7,51 +7,64 @@ from typing_extensions import (
     Dict,
     List,
     Optional,
+    Tuple,
     Type,
     cast,
     override,
 )
 
+from flexplan.datastructures.instancecreator import InstanceCreator
+from flexplan.errors import (
+    ArgumentTypeError,
+    ArgumentValueError,
+    WorkerNotFoundError,
+    WorkerRuntimeError,
+)
 from flexplan.messages.mail import Mail
 from flexplan.utils.inspect import getmethodclass
 from flexplan.workbench.base import Workbench, WorkbenchContext, enter_worker_context
 from flexplan.workers.base import Worker
 
 if TYPE_CHECKING:
-    from flexplan.datastructures.instancecreator import InstanceCreator
     from flexplan.datastructures.types import EventLike
-    from flexplan.errors import WorkerNotFoundError, WorkerRuntimeError
     from flexplan.messages.mail import MailBox
     from flexplan.stations.base import Station
-    from flexplan.types import StationSpec
+    from flexplan.types import WorkerSpec, WorkerId
 
 
 class Supervisor(Worker):
     def __init__(
         self,
-        station_specs: "Optional[List[StationSpec]]" = None,
+        worker_specs: "Optional[List[WorkerSpec]]" = None,
     ):
         super().__init__()
-        stations_preparation: Dict[str, "InstanceCreator[Station]"] = {}
-        if station_specs:
-            for name, station_creator in station_specs:
+        _specs: "Dict[WorkerId, Tuple[Optional[str], InstanceCreator[Station]]]" = {}
+        if worker_specs:
+            for worker_id, name, station_creator in worker_specs:
+                if not isinstance(worker_id, str):
+                    raise ArgumentTypeError(
+                        f"Unexpected worker_id type: {type(worker_id)}"
+                    )
+                elif worker_id in _specs:
+                    raise ArgumentValueError(f"Duplicate station name: {name}")
                 if name is None:
-                    name = f"station_{len(stations_preparation)}"
+                    name = f"station_{len(_specs)}"
                 elif not isinstance(name, str):
-                    raise TypeError(f"Unexpected name type: {type(name)}")
-                elif name in stations_preparation:
-                    raise ValueError(f"Duplicate station name: {name}")
-                stations_preparation[name] = station_creator
-        self._station_preparation = stations_preparation
-        self._worker_stations: Dict[str, "Station"] = {}
+                    raise ArgumentTypeError(f"Unexpected name type: {type(name)}")
+                if not isinstance(station_creator, InstanceCreator):
+                    raise ArgumentTypeError(
+                        f"Unexpected station creator type: {type(station_creator)}"
+                    )
+                _specs[worker_id] = (name, station_creator)
+        self._specs = _specs
+        self._worker_stations: "Dict[WorkerId, Station]" = {}
 
     def __post_init__(self):
         worker_stations = self._worker_stations
-        for name, station_creator in self._station_preparation.items():
-            print(f"Create station {name!r}: {station_creator}")
+        for worker_id, (name, station_creator) in self._specs.items():
             station = station_creator.create()
             station.start()
-            worker_stations[name] = station
+            worker_stations[worker_id] = station
 
     def __exit__(
         self,
@@ -59,35 +72,33 @@ class Supervisor(Worker):
         exc_val: Optional[BaseException],
         exc_tb: Optional[TracebackType],
     ) -> None:
-        for name, station in self._worker_stations.items():
-            print(f"Stop station {name!r}: {station}")
+        for station in self._worker_stations.values():
             station.stop()
 
     def handle(self, mail: Mail):
         instruction = mail.instruction
         if isinstance(instruction, str):
-            raise NotImplementedError()
+            raise NotImplementedError("Preserved for string events/signals")
         elif not callable(instruction):
             raise ValueError(f"{instruction!r} is not callable")
 
         try:
             cls = getmethodclass(instruction)
             if cls is None:
-                # simple function
-                raise NotImplementedError()
+                raise NotImplementedError("Simple functions are not supported yet")
             elif cls is type(self):
+                # supervisor method
                 result = instruction(self, *mail.args, **mail.kwargs)
                 if mail.future:
                     mail.future.set_result(result)
             else:
                 instance: Any = None
                 for station in self._worker_stations.values():
-                    print(f"{cls=!r} in {station.worker_class=}")
                     if cls is station.worker_class:
                         instance = cls
                         break
                 if instance is None:
-                    raise WorkerNotFoundError(f"{cls!r} is not available")
+                    raise WorkerNotFoundError(f"Worker not found: {cls!r}")
                 result = instruction(instance, *mail.args, **mail.kwargs)
                 if mail.future:
                     mail.future.set_result(result)
@@ -128,8 +139,12 @@ class SupervisorWorkbench(Workbench):
         running_event: "Optional[EventLike]" = None,
         **kwargs,
     ) -> None:
-        worker = worker_creator.create()
-        context = SupervisorContext(worker=worker, outbox=outbox)
+        try:
+            worker = worker_creator.create()
+            context = SupervisorContext(worker=worker, outbox=outbox)
+        except BaseException as exc:
+            outbox.put(exc)
+            return
 
         def is_running() -> bool:
             if running_event is None:

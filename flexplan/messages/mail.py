@@ -7,6 +7,7 @@ from typing_extensions import (
     Optional,
     Self,
     Sequence,
+    Union,
     final,
 )
 
@@ -98,4 +99,5 @@ class Mail:
         )
 
 
-MailBox = QueueLike[Mail]
+MailOrError = Optional[Union[Mail, BaseException]]
+MailBox = QueueLike[MailOrError]
