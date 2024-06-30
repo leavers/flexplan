@@ -4,12 +4,12 @@ from weakref import ref
 
 from typing_extensions import TYPE_CHECKING, Any, Optional, Self, Type
 
-from flexplan.utils.inspect import getmethodclass
+from flexplan.utils.inspect import get_method_class
 
 if TYPE_CHECKING:
     from weakref import ReferenceType
 
-    from flexplan.datastructures.instancecreator import InstanceCreator
+    from flexplan.datastructures.instancecreator import Creator
     from flexplan.datastructures.types import EventLike, TracebackType
     from flexplan.messages.mail import Mail, MailBox
     from flexplan.workers.base import Worker
@@ -33,7 +33,7 @@ class WorkbenchContext:
             if isinstance(instruction, str):
                 raise NotImplementedError()
             elif callable(instruction):
-                cls = getmethodclass(instruction)
+                cls = get_method_class(instruction)
                 if cls is not self.worker_cls:
                     raise ValueError(
                         f"{instruction!r} is not a method of {self.worker_cls!r}"
@@ -51,7 +51,7 @@ class WorkbenchContext:
             del self, mail
 
     @classmethod
-    def search_context(cls, depth: int = 2) -> Optional[Self]:
+    def get_context(cls, depth: int = 2) -> Optional[Self]:
         try:
             frame = get_frame(depth)
         except ValueError:
@@ -59,7 +59,8 @@ class WorkbenchContext:
         while True:
             co_self = frame.f_locals.get("self")
             co_name = frame.f_code.co_name
-            if isinstance(co_self, cls) and co_name == "invoke":
+            print(f"{co_self=}, {co_name=}")
+            if isinstance(co_self, cls) and co_name == cls.handle.__name__:
                 return co_self
             if not frame.f_back:
                 break
@@ -72,7 +73,7 @@ class Workbench(ABC):
     def run(
         self,
         *,
-        worker_creator: "InstanceCreator[Worker]",
+        worker_creator: "Creator[Worker]",
         inbox: "MailBox",
         outbox: "MailBox",
         running_event: "Optional[EventLike]" = None,

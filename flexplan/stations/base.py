@@ -4,7 +4,7 @@ from types import TracebackType
 from typing_extensions import TYPE_CHECKING, Optional, Self, Type
 
 if TYPE_CHECKING:
-    from flexplan.datastructures.instancecreator import Creator, InstanceCreator
+    from flexplan.datastructures.instancecreator import Creator
     from flexplan.messages.mail import Mail
     from flexplan.workbench.base import Workbench
     from flexplan.workers.base import Worker
@@ -48,6 +48,10 @@ class Station(ABC):
 
     @abstractmethod
     def send(self, mail: "Mail") -> None:
+        ...
+
+    @abstractmethod
+    def recv(self, timeout: Optional[float] = None) -> "Optional[Mail]":
         ...
 
     @property

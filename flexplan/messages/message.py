@@ -57,7 +57,7 @@ class Message:
         from flexplan.messages.mail import Mail
         from flexplan.workbench.base import WorkbenchContext
 
-        context = WorkbenchContext.search_context(2)
+        context = WorkbenchContext.get_context(2)
         if context is None:
             raise RuntimeError("Message should be sent from a running Worker")
         outbox = context.outbox_ref()
@@ -71,3 +71,9 @@ class Message:
         mail = Mail.new(message=self, future=future)
         outbox.put(mail)
         return future
+
+    def __repr__(self) -> str:
+        return (
+            f"{self.__class__.__name__}({self.instruction.__name__} "
+            f"args={self.args}, kwargs={self.kwargs})"
+        )

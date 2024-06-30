@@ -98,6 +98,12 @@ class Mail:
             future=future,
         )
 
+    def __repr__(self) -> str:
+        return (
+            f"{self.__class__.__name__}"
+            f"({self.instruction.__qualname__}, args={self.args!r}, kwargs={self.kwargs!r})"
+        )
+
 
 MailOrError = Optional[Union[Mail, BaseException]]
 MailBox = QueueLike[MailOrError]

@@ -1,5 +1,6 @@
 from queue import Empty
 from types import TracebackType
+from weakref import ref
 
 from typing_extensions import (
     TYPE_CHECKING,
@@ -20,14 +21,15 @@ from flexplan.errors import (
     WorkerNotFoundError,
     WorkerRuntimeError,
 )
-from flexplan.messages.mail import Mail
-from flexplan.utils.inspect import getmethodclass
+from flexplan.messages.mail import Mail, MailBox
+from flexplan.messages.message import Message
+from flexplan.utils.inspect import get_method_class
 from flexplan.workbench.base import Workbench, WorkbenchContext, enter_worker_context
 from flexplan.workers.base import Worker
 
 if TYPE_CHECKING:
+    from flexplan.datastructures.instancecreator import Creator
     from flexplan.datastructures.types import EventLike
-    from flexplan.messages.mail import MailBox
     from flexplan.stations.base import Station
     from flexplan.types import WorkerSpec, WorkerId
 
@@ -38,7 +40,7 @@ class Supervisor(Worker):
         worker_specs: "Optional[List[WorkerSpec]]" = None,
     ):
         super().__init__()
-        _specs: "Dict[WorkerId, Tuple[Optional[str], InstanceCreator[Station]]]" = {}
+        _specs: "Dict[WorkerId, Tuple[Optional[str], Creator[Station]]]" = {}
         if worker_specs:
             for worker_id, name, station_creator in worker_specs:
                 if not isinstance(worker_id, str):
@@ -61,6 +63,8 @@ class Supervisor(Worker):
 
     def __post_init__(self):
         worker_stations = self._worker_stations
+        if context := SupervisorContext.get_context():
+            context.set_worker_stations(worker_stations)
         for worker_id, (name, station_creator) in self._specs.items():
             station = station_creator.create()
             station.start()
@@ -83,7 +87,7 @@ class Supervisor(Worker):
             raise ValueError(f"{instruction!r} is not callable")
 
         try:
-            cls = getmethodclass(instruction)
+            cls = get_method_class(instruction)
             if cls is None:
                 raise NotImplementedError("Simple functions are not supported yet")
             elif cls is type(self):
@@ -92,16 +96,14 @@ class Supervisor(Worker):
                 if mail.future:
                     mail.future.set_result(result)
             else:
-                instance: Any = None
-                for station in self._worker_stations.values():
-                    if cls is station.worker_class:
-                        instance = cls
+                station: Optional[Station] = None
+                for worker_station in self._worker_stations.values():
+                    if cls is worker_station.worker_class:
+                        station = worker_station
                         break
-                if instance is None:
+                if station is None:
                     raise WorkerNotFoundError(f"Worker not found: {cls!r}")
-                result = instruction(instance, *mail.args, **mail.kwargs)
-                if mail.future:
-                    mail.future.set_result(result)
+                station.send(mail)
         except BaseException as exc:
             if mail.future:
                 mail.future.set_exception(exc)
@@ -110,6 +112,22 @@ class Supervisor(Worker):
 
 
 class SupervisorContext(WorkbenchContext):
+    def __init__(
+        self,
+        *,
+        worker: "Supervisor",
+        outbox: "MailBox",
+        workbench: "SupervisorWorkbench",
+    ) -> None:
+        super().__init__(worker=worker, outbox=outbox)
+        self._workbench = ref(workbench)
+
+    def set_worker_stations(self, worker_stations: "Dict[WorkerId, Station]"):
+        workbench = self._workbench()
+        if workbench is None:
+            raise WorkerRuntimeError(f"Workbench {self.worker_cls!r} is not available")
+        workbench.set_worker_stations(worker_stations)
+
     @override
     def handle(self, mail: Mail) -> Any:
         try:
@@ -129,19 +147,30 @@ class SupervisorContext(WorkbenchContext):
 
 
 class SupervisorWorkbench(Workbench):
+    def __init__(self):
+        super().__init__()
+        self._worker_stations: Optional[Dict[WorkerId, Station]] = None
+
+    def set_worker_stations(self, worker_stations: "Dict[WorkerId, Station]"):
+        self._worker_stations = worker_stations
+
     @override
     def run(
         self,
         *,
-        worker_creator: "InstanceCreator[Worker]",
+        worker_creator: "Creator[Worker]",
         inbox: "MailBox",
         outbox: "MailBox",
         running_event: "Optional[EventLike]" = None,
         **kwargs,
     ) -> None:
         try:
-            worker = worker_creator.create()
-            context = SupervisorContext(worker=worker, outbox=outbox)
+            supervisor = cast(Supervisor, worker_creator.create())
+            context = SupervisorContext(
+                worker=supervisor,
+                outbox=outbox,
+                workbench=self,
+            )
         except BaseException as exc:
             outbox.put(exc)
             return
@@ -154,22 +183,38 @@ class SupervisorWorkbench(Workbench):
         if running_event is not None:
             running_event.set()
 
-        context.post_init_worker()
+        if hasattr(supervisor, "__post_init__"):
+            context.handle(
+                Mail.new(message=Message(Supervisor.__post_init__).to(Supervisor))
+            )
 
-        with enter_worker_context(worker):
+        with enter_worker_context(supervisor):
             while is_running():
+                if self._worker_stations is not None:
+                    for station in self._worker_stations.values():
+                        if worker_mail := station.recv(0):
+                            context.handle(worker_mail)
                 try:
-                    mail = inbox.get(timeout=0.1)
+                    mail = inbox.get(timeout=0)
                 except Empty:
                     continue
                 if mail is None:
                     break
+                elif isinstance(mail, BaseException):
+                    raise WorkerRuntimeError() from mail
                 context.handle(mail)
             while not inbox.empty():
+                if self._worker_stations is not None:
+                    for station in self._worker_stations.values():
+                        if worker_mail := station.recv(0):
+                            context.handle(worker_mail)
                 mail = inbox.get()
                 if mail is None:
                     continue
+                elif isinstance(mail, BaseException):
+                    raise WorkerRuntimeError() from mail
                 context.handle(mail)
+        self._worker_stations = None
 
         if running_event is not None:
             running_event.clear()

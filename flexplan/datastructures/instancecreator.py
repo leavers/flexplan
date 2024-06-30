@@ -6,6 +6,7 @@ from typing_extensions import (
     ParamSpec,
     Protocol,
     Tuple,
+    Type,
     TypeVar,
 )
 
@@ -16,7 +17,7 @@ T_cov = TypeVar("T_cov", covariant=True)
 
 class Creator(Protocol[T_cov]):
     @property
-    def type(self) -> Callable[..., T_cov]:
+    def type(self) -> Type[T_cov]:
         ...
 
     @property

@@ -4,7 +4,7 @@ from inspect import getmodule, getmro, isbuiltin, isfunction, ismethod
 from typing_extensions import Any, Callable, Optional, Type, TypeVar
 
 __all__ = (
-    "getmethodclass",
+    "get_method_class",
     "getmodule",
     "getmro",
     "isbuiltin",
@@ -30,7 +30,7 @@ def ispartialmethod(obj: Any) -> bool:
 _warn_nested_class = False
 
 
-def getmethodclass(method: Callable) -> Optional[Type]:
+def get_method_class(method: Callable) -> Optional[Type]:
     """Get the class of a method, if not found then ``None`` is returned.
 
     Note that ``getmethodclass`` does not work with:
@@ -48,19 +48,19 @@ def getmethodclass(method: Callable) -> Optional[Type]:
     """
 
     if isinstance(method, partial):
-        return getmethodclass(method.func)
+        return get_method_class(method.func)
     if ispartialmethod(method):
-        return getmethodclass(getattr(getattr(method, "_partialmethod"), "func"))
+        return get_method_class(getattr(getattr(method, "_partialmethod"), "func"))
     if hasattr(method, "__wrapped__"):
-        return getmethodclass(getattr(method, "__wrapped__"))
+        return get_method_class(getattr(method, "__wrapped__"))
     if isinstance(method, property):
         if method.fget:
-            return getmethodclass(method.fget)
+            return get_method_class(method.fget)
         elif method.fset:
-            return getmethodclass(method.fset)
+            return get_method_class(method.fset)
         return None
     if isinstance(method, cached_property):
-        return getmethodclass(method.func)
+        return get_method_class(method.func)
     if ismethod(method) or (
         isbuiltin(method)
         and hasattr(method, "__self__")

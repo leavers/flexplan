@@ -3,6 +3,7 @@ from threading import Event, Thread
 
 from typing_extensions import TYPE_CHECKING, Optional, override
 
+from flexplan.messages.mail import Mail
 from flexplan.stations.base import Station
 
 if TYPE_CHECKING:
@@ -74,3 +75,10 @@ class ThreadStation(Station):
     @override
     def send(self, mail: "Mail") -> None:
         self._inbox.put(mail)
+
+    @override
+    def recv(self, timeout: Optional[float] = None) -> "Optional[Mail]":
+        try:
+            return self._outbox.get(timeout=timeout)
+        except Empty:
+            return None
