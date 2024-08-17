@@ -12,6 +12,7 @@ from typing_extensions import (
     overload,
 )
 
+from flexplan.datastructures.deferredbox import DeferredBox
 from flexplan.datastructures.future import Future
 from flexplan.datastructures.instancecreator import Creator, InstanceCreator
 from flexplan.messages.mail import Mail
@@ -138,6 +139,7 @@ class Workshop(ThreadStation):
                 )
             message = Message(fn).params(*args, **kwargs)
 
-        future: Future = Future()
-        self.send(Mail.new(message=message, future=future))
+        box: DeferredBox[Future] = DeferredBox()
+        self.send(Mail.new(message=message, future=box))
+        future = box.get()
         return future

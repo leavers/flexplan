@@ -1,5 +1,4 @@
 from typing_extensions import (
-    TYPE_CHECKING,
     Any,
     Callable,
     Dict,
@@ -11,12 +10,10 @@ from typing_extensions import (
     final,
 )
 
+from flexplan.datastructures.deferredbox import DeferredBox
+from flexplan.datastructures.future import Future
 from flexplan.datastructures.types import QueueLike
-
-if TYPE_CHECKING:
-    from concurrent.futures import Future
-
-    from flexplan.messages.message import Message
+from flexplan.messages.message import Message
 
 
 @final
@@ -66,7 +63,7 @@ class Mail:
         args: Sequence[Any] = (),
         kwargs: Optional[Dict[str, Any]] = None,
         meta: MailMeta,
-        future: Optional["Future"] = None,
+        future: Optional[Union[DeferredBox, Future]] = None,
     ) -> None:
         self.instruction = instruction
         self.args = tuple(args)
@@ -77,7 +74,12 @@ class Mail:
         self.meta = meta
 
     @classmethod
-    def new(cls, *, message: "Message", future: "Optional[Future]" = None) -> Self:
+    def new(
+        cls,
+        *,
+        message: Message,
+        future: Optional[Union[DeferredBox, Future]] = None,
+    ) -> Self:
         args = message.args
         if args is None:
             args = ()

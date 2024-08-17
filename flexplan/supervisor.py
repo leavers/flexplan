@@ -14,7 +14,8 @@ from typing_extensions import (
     override,
 )
 
-from flexplan.datastructures.future import ProcessFuture, ProcessFutureManager
+from flexplan.datastructures.deferredbox import DeferredBox
+from flexplan.datastructures.future import Future, ProcessFuture, ProcessFutureManager
 from flexplan.datastructures.instancecreator import InstanceCreator
 from flexplan.errors import (
     ArgumentTypeError,
@@ -113,9 +114,18 @@ class Supervisor(Worker):
                 raise NotImplementedError("Simple functions are not supported yet")
             elif cls is type(self):
                 # supervisor method
-                result = instruction(self, *mail.args, **mail.kwargs)
-                if mail.future:
-                    mail.future.set_result(result)
+                # TODO: refactor duplicated code
+                if (box := mail.future) is not None:
+                    if isinstance(box, DeferredBox):
+                        future: Future = Future()
+                        box.set(future)
+                        mail.future = future
+                    else:
+                        future = cast(Future, box)
+                    result = instruction(self, *mail.args, **mail.kwargs)
+                    future.set_result(result)
+                else:
+                    result = instruction(self, *mail.args, **mail.kwargs)
             else:
                 station: Optional[Station] = None
                 for worker_station in self._worker_stations.values():
@@ -125,21 +135,26 @@ class Supervisor(Worker):
                         break
                 if station is None:
                     raise WorkerNotFoundError(f"Worker not found: {cls!r}")
-                if (
-                    mail.future is not None
-                    and station.spec.use_process_future
-                    and not isinstance(mail.future, ProcessFuture)
-                ):
-                    import os
-                    print(f"Patch future in pid {os.getpid()}")
-                    org_future = mail.future
-                    new_future = self._process_future_manager.Future()
-                    new_future.add_done_callback(func)
-                    mail.future = new_future
+                if (box := mail.future) is not None:
+                    if isinstance(box, DeferredBox):
+                        if station.spec.use_process_future:
+                            print("ProcessFuture")
+                            future = self._process_future_manager.Future()
+                        else:
+                            print("Normal Future")
+                            future: Future = Future()
+                        box.set(future)
+                        mail.future = future
+                    else:
+                        future = cast(Future, box)
                 station.send(mail)
         except BaseException as exc:
-            if mail.future:
-                mail.future.set_exception(exc)
+            if (box := mail.future) is not None:
+                if isinstance(box, DeferredBox):
+                    future: Future = Future()
+                    box.set(future)
+                    mail.future = future
+                future: Future = Future()
             if not isinstance(exc, Exception):
                 raise
 

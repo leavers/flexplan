@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
 from types import TracebackType
 
 from typing_extensions import TYPE_CHECKING, Optional, Self, Type
@@ -11,9 +10,15 @@ if TYPE_CHECKING:
     from flexplan.workers.base import Worker
 
 
-@dataclass
 class StationSpec:
-    use_process_future: bool
+    __slots__ = ("use_process_future",)
+
+    def __init__(
+        self,
+        *,
+        use_process_future: bool,
+    ):
+        self.use_process_future = use_process_future
 
 
 class Station(ABC):
