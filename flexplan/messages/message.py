@@ -49,7 +49,7 @@ class Message:
     def submit(self) -> "Future":
         return self._send(use_future=True)  # type: ignore[return-value]
 
-    def dispatch(self) -> None:
+    def emit(self) -> None:
         self._send(use_future=False)
 
     def _send(self, use_future: bool) -> "Optional[Future]":
@@ -60,12 +60,12 @@ class Message:
         context = WorkbenchContext.get_context(2)
         if context is None:
             raise RuntimeError("Message should be sent from a running Worker")
-        outbox = context.outbox_ref()
+        outbox = context._outbox_ref()
         if outbox is None:
             raise RuntimeError("Worker context is corrupted")
 
         if use_future:
-            future: Optional[Future] = Future()
+            future: Optional[Future] = context.create_future()
         else:
             future = None
         mail = Mail.new(message=self, future=future)

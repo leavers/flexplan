@@ -1,5 +1,4 @@
 from typing_extensions import (
-    TYPE_CHECKING,
     Any,
     Callable,
     Concatenate,
@@ -15,17 +14,16 @@ from typing_extensions import (
 
 from flexplan.datastructures.future import Future
 from flexplan.datastructures.instancecreator import Creator, InstanceCreator
+from flexplan.messages.mail import Mail
+from flexplan.messages.message import Message
 from flexplan.stations.base import Station
 from flexplan.stations.thread import ThreadStation
 from flexplan.supervisor import Supervisor, SupervisorWorkbench
+from flexplan.types import WorkerSpec
 from flexplan.utils.identity import gen_worker_id
 from flexplan.workbench.base import Workbench
 from flexplan.workbench.loop import LoopWorkbench
 from flexplan.workers.base import Worker
-
-if TYPE_CHECKING:
-    from flexplan.messages.message import Message
-    from flexplan.types import WorkerSpec
 
 
 P = ParamSpec("P")
@@ -131,9 +129,6 @@ class Workshop(ThreadStation):
         *args,
         **kwargs,
     ) -> Future:
-        from flexplan.messages.mail import Mail
-        from flexplan.messages.message import Message
-
         if isinstance(fn, Message):
             message = fn
         else:

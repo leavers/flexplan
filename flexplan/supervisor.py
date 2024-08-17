@@ -14,6 +14,7 @@ from typing_extensions import (
     override,
 )
 
+from flexplan.datastructures.future import ProcessFuture, ProcessFutureManager
 from flexplan.datastructures.instancecreator import InstanceCreator
 from flexplan.errors import (
     ArgumentTypeError,
@@ -23,6 +24,8 @@ from flexplan.errors import (
 )
 from flexplan.messages.mail import Mail, MailBox
 from flexplan.messages.message import Message
+from flexplan.stations.base import Station, StationSpec
+from flexplan.stations.mixins import NotifyRuntimeInfoMixin, RuntimeInfo
 from flexplan.utils.inspect import get_method_class
 from flexplan.workbench.base import Workbench, WorkbenchContext, enter_worker_context
 from flexplan.workers.base import Worker
@@ -30,7 +33,6 @@ from flexplan.workers.base import Worker
 if TYPE_CHECKING:
     from flexplan.datastructures.instancecreator import Creator
     from flexplan.datastructures.types import EventLike
-    from flexplan.stations.base import Station
     from flexplan.types import WorkerSpec, WorkerId
 
 
@@ -60,15 +62,31 @@ class Supervisor(Worker):
                 _specs[worker_id] = (name, station_creator)
         self._specs = _specs
         self._worker_stations: "Dict[WorkerId, Station]" = {}
+        self._process_future_manager: Optional[ProcessFutureManager] = None
 
     def __post_init__(self):
         worker_stations = self._worker_stations
         if context := SupervisorContext.get_context():
             context.set_worker_stations(worker_stations)
+        info = RuntimeInfo(process_future_manager_address=None)
         for worker_id, (name, station_creator) in self._specs.items():
             station = station_creator.create()
+            if station.spec.use_process_future:
+                if self._process_future_manager is None:
+                    self._process_future_manager = ProcessFutureManager()
+                    self._process_future_manager.start()
+                    info.process_future_manager_address = (
+                        self._process_future_manager.address
+                    )
+                    print(f"{info.process_future_manager_address=}")
+            if isinstance(station, NotifyRuntimeInfoMixin):
+                station.notify_runtime_info(info)
+            print(f"Start, {station=}")
             station.start()
+            print("Started")
             worker_stations[worker_id] = station
+        print("222")
+        print(f"{worker_stations=}")
 
     def __exit__(
         self,
@@ -78,8 +96,11 @@ class Supervisor(Worker):
     ) -> None:
         for station in self._worker_stations.values():
             station.stop()
+        if self._process_future_manager is not None:
+            self._process_future_manager.shutdown()
+            self._process_future_manager = None
 
-    def handle(self, mail: Mail):
+    def relay(self, mail: Mail):
         instruction = mail.instruction
         if isinstance(instruction, str):
             raise NotImplementedError("Preserved for string events/signals")
@@ -98,11 +119,23 @@ class Supervisor(Worker):
             else:
                 station: Optional[Station] = None
                 for worker_station in self._worker_stations.values():
+                    print(f"{cls=}, {worker_station.worker_class=}")
                     if cls is worker_station.worker_class:
                         station = worker_station
                         break
                 if station is None:
                     raise WorkerNotFoundError(f"Worker not found: {cls!r}")
+                if (
+                    mail.future is not None
+                    and station.spec.use_process_future
+                    and not isinstance(mail.future, ProcessFuture)
+                ):
+                    import os
+                    print(f"Patch future in pid {os.getpid()}")
+                    org_future = mail.future
+                    new_future = self._process_future_manager.Future()
+                    new_future.add_done_callback(func)
+                    mail.future = new_future
                 station.send(mail)
         except BaseException as exc:
             if mail.future:
@@ -111,31 +144,36 @@ class Supervisor(Worker):
                 raise
 
 
+def func(future):
+    import os
+    print(f"Future done {future.result()=} {os.getpid()=}")
+
 class SupervisorContext(WorkbenchContext):
     def __init__(
         self,
         *,
+        station_spec: "StationSpec",
         worker: "Supervisor",
         outbox: "MailBox",
         workbench: "SupervisorWorkbench",
     ) -> None:
-        super().__init__(worker=worker, outbox=outbox)
+        super().__init__(station_spec=station_spec, worker=worker, outbox=outbox)
         self._workbench = ref(workbench)
 
     def set_worker_stations(self, worker_stations: "Dict[WorkerId, Station]"):
         workbench = self._workbench()
         if workbench is None:
-            raise WorkerRuntimeError(f"Workbench {self.worker_cls!r} is not available")
+            raise WorkerRuntimeError(f"Workbench {self._worker_cls!r} is not available")
         workbench.set_worker_stations(worker_stations)
 
     @override
     def handle(self, mail: Mail) -> Any:
         try:
-            if supervisor := cast(Optional[Supervisor], self.worker_ref()):
-                supervisor.handle(mail)
+            if supervisor := cast(Optional[Supervisor], self._worker_ref()):
+                supervisor.relay(mail)
             else:
                 raise WorkerRuntimeError(
-                    f"Supervisor {self.worker_cls!r} is not available"
+                    f"Supervisor {self._worker_cls!r} is not available"
                 )
         except BaseException as exc:
             if mail.future:
@@ -158,6 +196,7 @@ class SupervisorWorkbench(Workbench):
     def run(
         self,
         *,
+        station_spec: "StationSpec",
         worker_creator: "Creator[Worker]",
         inbox: "MailBox",
         outbox: "MailBox",
@@ -167,6 +206,7 @@ class SupervisorWorkbench(Workbench):
         try:
             supervisor = cast(Supervisor, worker_creator.create())
             context = SupervisorContext(
+                station_spec=station_spec,
                 worker=supervisor,
                 outbox=outbox,
                 workbench=self,

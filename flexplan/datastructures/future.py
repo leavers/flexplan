@@ -163,7 +163,8 @@ class ProcessFuture(Future, metaclass=ProcessFutureMeta):
 
 
 class ProcessFutureManager(SyncManager):
-    ...
+    def Future(self) -> ProcessFuture:
+        raise NotImplementedError()
 
 
 ProcessFutureManager.register("Future", Future)

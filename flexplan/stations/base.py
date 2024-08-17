@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from types import TracebackType
 
 from typing_extensions import TYPE_CHECKING, Optional, Self, Type
@@ -8,6 +9,11 @@ if TYPE_CHECKING:
     from flexplan.messages.mail import Mail
     from flexplan.workbench.base import Workbench
     from flexplan.workers.base import Worker
+
+
+@dataclass
+class StationSpec:
+    use_process_future: bool
 
 
 class Station(ABC):
@@ -57,3 +63,8 @@ class Station(ABC):
     @property
     def worker_class(self) -> "Type[Worker]":
         return self._worker_class
+
+    @property
+    @abstractmethod
+    def spec(self) -> StationSpec:
+        ...
