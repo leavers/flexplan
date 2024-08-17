@@ -1,5 +1,5 @@
-from queue import Empty
 from multiprocessing import get_context
+from queue import Empty
 
 from typing_extensions import TYPE_CHECKING, Optional, Union, override
 

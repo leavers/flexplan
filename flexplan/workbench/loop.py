@@ -1,6 +1,6 @@
 from queue import Empty
 
-from typing_extensions import TYPE_CHECKING, Optional, Type, override
+from typing_extensions import TYPE_CHECKING, Optional, override
 
 from flexplan.workbench.base import Workbench, WorkbenchContext, enter_worker_context
 

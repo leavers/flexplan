@@ -26,7 +26,6 @@ from flexplan.workbench.base import Workbench
 from flexplan.workbench.loop import LoopWorkbench
 from flexplan.workers.base import Worker
 
-
 P = ParamSpec("P")
 R = TypeVar("R")
 
@@ -106,8 +105,7 @@ class Workshop(ThreadStation):
         /,
         *args: P.args,
         **kwargs: P.kwargs,
-    ) -> Future[R]:
-        ...
+    ) -> Future[R]: ...
 
     @overload
     def submit(
@@ -116,12 +114,10 @@ class Workshop(ThreadStation):
         /,
         *args: P.args,
         **kwargs: P.kwargs,
-    ) -> Future[R]:
-        ...
+    ) -> Future[R]: ...
 
     @overload
-    def submit(self, fn: "Message", /) -> Future:
-        ...
+    def submit(self, fn: "Message", /) -> Future: ...
 
     def submit(
         self,

@@ -107,8 +107,7 @@ class Workbench(ABC):
         terminate_event: "Optional[EventLike]" = None,
         future_manager_address: "Optional[str]" = None,
         **kwargs,
-    ) -> None:
-        ...
+    ) -> None: ...
 
 
 class _EnterWorkerContext:

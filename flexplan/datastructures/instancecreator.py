@@ -22,34 +22,28 @@ T_cov = TypeVar("T_cov", covariant=True)
 class Creator(Generic[T_cov]):
     @property
     @abstractmethod
-    def type(self) -> Type[T_cov]:
-        ...
+    def type(self) -> Type[T_cov]: ...
 
     @property
     @abstractmethod
-    def args(self) -> Tuple[Any, ...]:
-        ...
+    def args(self) -> Tuple[Any, ...]: ...
 
     @property
     @abstractmethod
-    def kwargs(self) -> Dict[str, Any]:
-        ...
+    def kwargs(self) -> Dict[str, Any]: ...
 
     @abstractmethod
-    def create(self) -> T_cov:
-        ...
+    def create(self) -> T_cov: ...
 
 
 class InstanceCreator(Creator[T]):
     __slots__ = ("_creator", "_type", "_args", "_kwargs")
 
     @overload
-    def __init__(self, creator: Type[T]):
-        ...
+    def __init__(self, creator: Type[T]): ...
 
     @overload
-    def __init__(self, creator: Callable[..., T], type_: Type[T]):
-        ...
+    def __init__(self, creator: Callable[..., T], type_: Type[T]): ...
 
     def __init__(
         self,

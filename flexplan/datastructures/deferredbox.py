@@ -1,7 +1,6 @@
 from threading import Event
 from typing import Generic, Optional, TypeVar, cast
 
-
 T = TypeVar("T")
 
 

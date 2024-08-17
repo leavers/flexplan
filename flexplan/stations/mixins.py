@@ -16,5 +16,4 @@ class RuntimeInfo:
 
 class NotifyRuntimeInfoMixin:
     @abstractmethod
-    def notify_runtime_info(self, info: RuntimeInfo) -> None:
-        ...
+    def notify_runtime_info(self, info: RuntimeInfo) -> None: ...

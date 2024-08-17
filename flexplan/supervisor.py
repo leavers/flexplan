@@ -15,7 +15,7 @@ from typing_extensions import (
 )
 
 from flexplan.datastructures.deferredbox import DeferredBox
-from flexplan.datastructures.future import Future, ProcessFuture, ProcessFutureManager
+from flexplan.datastructures.future import Future, ProcessFutureManager
 from flexplan.datastructures.instancecreator import InstanceCreator
 from flexplan.errors import (
     ArgumentTypeError,
@@ -34,7 +34,7 @@ from flexplan.workers.base import Worker
 if TYPE_CHECKING:
     from flexplan.datastructures.instancecreator import Creator
     from flexplan.datastructures.types import EventLike
-    from flexplan.types import WorkerSpec, WorkerId
+    from flexplan.types import WorkerId, WorkerSpec
 
 
 class Supervisor(Worker):
@@ -161,7 +161,9 @@ class Supervisor(Worker):
 
 def func(future):
     import os
+
     print(f"Future done {future.result()=} {os.getpid()=}")
+
 
 class SupervisorContext(WorkbenchContext):
     def __init__(
