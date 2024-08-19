@@ -10,6 +10,17 @@ if TYPE_CHECKING:
     from flexplan.workers.base import Worker
 
 
+class StationSpec:
+    __slots__ = ("use_process_future",)
+
+    def __init__(
+        self,
+        *,
+        use_process_future: bool,
+    ):
+        self.use_process_future = use_process_future
+
+
 class Station(ABC):
     def __init__(
         self,
@@ -22,12 +33,10 @@ class Station(ABC):
         self._worker_class = worker_creator.type
 
     @abstractmethod
-    def start(self) -> None:
-        ...
+    def start(self) -> None: ...
 
     @abstractmethod
-    def stop(self) -> None:
-        ...
+    def stop(self) -> None: ...
 
     def __enter__(self) -> Self:
         if not self.is_running():
@@ -43,17 +52,18 @@ class Station(ABC):
         self.stop()
 
     @abstractmethod
-    def is_running(self) -> bool:
-        ...
+    def is_running(self) -> bool: ...
 
     @abstractmethod
-    def send(self, mail: "Mail") -> None:
-        ...
+    def send(self, mail: "Mail") -> None: ...
 
     @abstractmethod
-    def recv(self, timeout: Optional[float] = None) -> "Optional[Mail]":
-        ...
+    def recv(self, timeout: Optional[float] = None) -> "Optional[Mail]": ...
 
     @property
     def worker_class(self) -> "Type[Worker]":
         return self._worker_class
+
+    @property
+    @abstractmethod
+    def spec(self) -> StationSpec: ...

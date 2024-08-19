@@ -28,8 +28,7 @@ class WorkerIntrospection:
 
 
 class Worker(ABC):
-    def __post_init__(self):
-        ...
+    def __post_init__(self): ...
 
     def __enter__(self):
         return self
@@ -39,11 +38,9 @@ class Worker(ABC):
         exc_type: t.Optional[t.Type[BaseException]],
         exc_val: t.Optional[BaseException],
         exc_tb: t.Optional[TracebackType],
-    ) -> None:
-        ...
+    ) -> None: ...
 
-    def on(self, message: "Message"):
-        ...
+    def on(self, message: "Message"): ...
 
     @property
     def introspection(self) -> WorkerIntrospection:
@@ -57,5 +54,4 @@ class Worker(ABC):
             raise AttributeError("introspection already set")
         setattr(self, "_intro7n", value)
 
-    def __finalize__(self):
-        ...
+    def __finalize__(self): ...

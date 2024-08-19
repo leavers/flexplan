@@ -3,11 +3,10 @@ from threading import Event, Thread
 
 from typing_extensions import TYPE_CHECKING, Optional, override
 
-from flexplan.messages.mail import Mail
-from flexplan.stations.base import Station
+from flexplan.stations.base import Station, StationSpec
 
 if TYPE_CHECKING:
-    from flexplan.datastructures.instancecreator import Creator, InstanceCreator
+    from flexplan.datastructures.instancecreator import Creator
     from flexplan.messages.mail import Mail
     from flexplan.workbench.base import Workbench
     from flexplan.workers.base import Worker
@@ -30,6 +29,7 @@ class ThreadStation(Station):
         self._running_event = Event()
         self._terminate_event = Event()
         self._thread: Optional[Thread] = None
+        self._spec = StationSpec(use_process_future=False)
 
     @override
     def start(self):
@@ -40,6 +40,7 @@ class ThreadStation(Station):
         self._thread = Thread(
             target=workbench.run,
             kwargs={
+                "station_spec": self._spec,
                 "worker_creator": self._worker_creator,
                 "inbox": self._inbox,
                 "outbox": self._outbox,
@@ -82,3 +83,8 @@ class ThreadStation(Station):
             return self._outbox.get(timeout=timeout)
         except Empty:
             return None
+
+    @property
+    @override
+    def spec(self) -> StationSpec:
+        return self._spec
