@@ -1,7 +1,6 @@
 from concurrent.futures import Future as BuiltinFuture
 from concurrent.futures._base import _STATE_TO_DESCRIPTION_MAP, FINISHED
 from multiprocessing.managers import SyncManager
-from re import I
 
 from typing_extensions import (
     Any,

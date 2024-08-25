@@ -24,10 +24,7 @@ classifiers = [
   "Topic :: Software Development :: Libraries :: Python Modules",
   "Topic :: Utilities",
 ]
-dependencies = [
-    "flexexecutor>=0.0.11",
-    "typing-extensions>=4.8.0",
-]
+dependencies = ["flexexecutor>=0.0.11", "typing-extensions>=4.8.0"]
 dynamic = ["version"]
 
 [project.urls]
