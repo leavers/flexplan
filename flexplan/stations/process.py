@@ -3,17 +3,16 @@ from queue import Empty
 
 from typing_extensions import TYPE_CHECKING, Optional, Union, override
 
+from flexplan.datastructures.instancecreator import Creator
+from flexplan.messages.mail import Mail
 from flexplan.stations.base import Station, StationSpec
 from flexplan.stations.mixins import NotifyRuntimeInfoMixin, RuntimeInfo
+from flexplan.workbench.base import Workbench
+from flexplan.workers.base import Worker
 
 if TYPE_CHECKING:
     from multiprocessing.context import ForkContext, ForkServerContext, SpawnContext
     from multiprocessing.process import BaseProcess
-
-    from flexplan.datastructures.instancecreator import Creator
-    from flexplan.messages.mail import Mail
-    from flexplan.workbench.base import Workbench
-    from flexplan.workers.base import Worker
 
     AnyContext = Union[ForkContext, ForkServerContext, SpawnContext]
 
@@ -22,8 +21,8 @@ class ProcessStation(Station, NotifyRuntimeInfoMixin):
     def __init__(
         self,
         *,
-        workbench_creator: "Creator[Workbench]",
-        worker_creator: "Creator[Worker]",
+        workbench_creator: Creator[Workbench],
+        worker_creator: Creator[Worker],
         mp_context: "Optional[AnyContext]" = None,
     ):
         super().__init__(
@@ -53,15 +52,12 @@ class ProcessStation(Station, NotifyRuntimeInfoMixin):
 
     @override
     def start(self):
-        print("000")
         if self.is_running():
             raise RuntimeError(f"{self.__class__.__name__} is already running")
         elif self._process_future_manager_address is None:
             raise ValueError("process_future_manager_address is None")
         self._invoked = True
-        print("111")
         workbench = self._workbench_creator.create()
-        print("222")
         self._process = self._mp_ctx.Process(
             target=workbench.run,
             kwargs={
@@ -75,9 +71,7 @@ class ProcessStation(Station, NotifyRuntimeInfoMixin):
             },
             daemon=True,
         )
-        print("333")
         self._process.start()
-        print(f"Process stated, {workbench=}")
 
         re = self._running_event
         outbox = self._outbox
@@ -102,11 +96,11 @@ class ProcessStation(Station, NotifyRuntimeInfoMixin):
         return self._running_event.is_set()
 
     @override
-    def send(self, mail: "Mail") -> None:
+    def send(self, mail: Mail) -> None:
         self._inbox.put(mail)
 
     @override
-    def recv(self, timeout: Optional[float] = None) -> "Optional[Mail]":
+    def recv(self, timeout: Optional[float] = None) -> Optional[Mail]:
         try:
             return self._outbox.get(timeout=timeout)
         except Empty:
@@ -116,3 +110,45 @@ class ProcessStation(Station, NotifyRuntimeInfoMixin):
     @override
     def spec(self) -> StationSpec:
         return self._spec
+
+
+class ForkProcessStation(ProcessStation):
+    def __init__(
+        self,
+        *,
+        workbench_creator: Creator[Workbench],
+        worker_creator: Creator[Worker],
+    ):
+        super().__init__(
+            workbench_creator=workbench_creator,
+            worker_creator=worker_creator,
+            mp_context=get_context("fork"),
+        )
+
+
+class ForkServerProcessStation(ProcessStation):
+    def __init__(
+        self,
+        *,
+        workbench_creator: Creator[Workbench],
+        worker_creator: Creator[Worker],
+    ):
+        super().__init__(
+            workbench_creator=workbench_creator,
+            worker_creator=worker_creator,
+            mp_context=get_context("forkserver"),
+        )
+
+
+class SpawnProcessStation(ProcessStation):
+    def __init__(
+        self,
+        *,
+        workbench_creator: Creator[Workbench],
+        worker_creator: Creator[Worker],
+    ):
+        super().__init__(
+            workbench_creator=workbench_creator,
+            worker_creator=worker_creator,
+            mp_context=get_context("spawn"),
+        )

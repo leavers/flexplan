@@ -1,6 +1,7 @@
 from concurrent.futures import Future as BuiltinFuture
 from concurrent.futures._base import _STATE_TO_DESCRIPTION_MAP, FINISHED
 from multiprocessing.managers import SyncManager
+from re import I
 
 from typing_extensions import (
     Any,
@@ -43,33 +44,36 @@ def _proxy_impl(
 
     if method_name == "set_result":
 
-        def wrapped(self: "ProcessFuture", result: Any):  # type: ignore
-            self._remote.set_result(_pickle.dumps(result))
+        def wrapped(self: "FutureProxy", result: Any):  # type: ignore
+            self._future.set_result(_pickle.dumps(result))
             self._invoke_callbacks()  # type: ignore
 
     elif method_name == "result":
 
         def wrapped(  # type: ignore
-            self: "ProcessFuture",
+            self: "FutureProxy",
             timeout: Optional[float] = None,
         ):
             try:
-                raw = self._remote.result(timeout=timeout)
-                return _pickle.loads(raw)
+                if self._simple:
+                    return self._future.result(timeout=timeout)
+                else:
+                    raw = self._future.result(timeout=timeout)
+                    return _pickle.loads(raw)
             finally:
                 self = None  # type: ignore
 
     elif invoke_callback:
 
-        def wrapped(self: "ProcessFuture", *args, **kwargs):  # type: ignore
-            res = getattr(self._remote, method_name)(*args, **kwargs)
+        def wrapped(self: "FutureProxy", *args, **kwargs):  # type: ignore
+            res = getattr(self._future, method_name)(*args, **kwargs)
             self._invoke_callbacks()  # type: ignore
             return res
 
     else:
 
-        def wrapped(self: "ProcessFuture", *args, **kwargs):  # type: ignore
-            return getattr(self._remote, method_name)(*args, **kwargs)
+        def wrapped(self: "FutureProxy", *args, **kwargs):  # type: ignore
+            return getattr(self._future, method_name)(*args, **kwargs)
 
     setattr(wrapped, "__module__", module_name)
     setattr(wrapped, "__name__", method_name)
@@ -85,7 +89,7 @@ def _proxy_impl(
     return wrapped
 
 
-class ProcessFutureMeta(type):
+class FutureProxyMeta(type):
     def __new__(
         cls,
         name: str,
@@ -122,10 +126,11 @@ class ProcessFutureMeta(type):
         return super().__new__(cls, name, bases, namespace, **kwargs)
 
 
-class ProcessFuture(Future, metaclass=ProcessFutureMeta):
-    def __init__(self, remote: Future) -> None:
-        self._remote = remote
-        self._done_callbacks: List[Callable[["ProcessFuture"], Any]] = []
+class FutureProxy(Future, metaclass=FutureProxyMeta):
+    def __init__(self, future: BuiltinFuture) -> None:
+        self._future = future
+        self._simple = isinstance(future, BuiltinFuture)
+        self._done_callbacks: List[Callable[["FutureProxy"], Any]] = []
 
     def __repr__(self) -> str:
         # reimplement to avoid calling self._condition and self._state
@@ -133,23 +138,20 @@ class ProcessFuture(Future, metaclass=ProcessFutureMeta):
         if state == FINISHED:
             try:
                 res = self.result()
-                return "<%s at %#x state=%s returned %s>" % (
-                    self.__class__.__name__,
-                    id(self),
-                    _STATE_TO_DESCRIPTION_MAP[state],
-                    res.__class__.__name__,
+                return (
+                    f"<{self.__class__.__name__} at "
+                    f"{id(self):#x} state={_STATE_TO_DESCRIPTION_MAP[state]} "
+                    f"returned {res.__class__.__name__}>"
                 )
             except Exception as exc:
-                return "<%s at %#x state=%s raised %s>" % (
-                    self.__class__.__name__,
-                    id(self),
-                    _STATE_TO_DESCRIPTION_MAP[state],
-                    exc.__class__.__name__,
+                return (
+                    f"<{self.__class__.__name__} at "
+                    f"{id(self):#x} state={_STATE_TO_DESCRIPTION_MAP[state]} "
+                    f"raised {exc.__class__.__name__}>"
                 )
-        return "<%s at %#x state=%s>" % (
-            self.__class__.__name__,
-            id(self),
-            _STATE_TO_DESCRIPTION_MAP[state],
+        return (
+            f"<{self.__class__.__name__} at "
+            f"{id(self):#x} state={_STATE_TO_DESCRIPTION_MAP[state]} "
         )
 
     def add_done_callback(self, fn):
@@ -161,9 +163,12 @@ class ProcessFuture(Future, metaclass=ProcessFutureMeta):
         except Exception:
             print("exception calling callback for %r", self)
 
+    def unwrap(self) -> Future:
+        return self._future
+
 
 class ProcessFutureManager(SyncManager):
-    def Future(self) -> ProcessFuture:
+    def Future(self) -> FutureProxy:
         raise NotImplementedError()
 
 

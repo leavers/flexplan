@@ -42,8 +42,8 @@ class Workshop(ThreadStation):
         worker: Union[Type[Worker], Creator[Worker]],
         name: Optional[str] = None,
         *,
+        station: Optional[Union[Type[Station], Creator[Station], str]] = None,
         workbench: Optional[Union[Type[Workbench], Creator[Workbench]]] = None,
-        station: Optional[Union[Type[Station], Creator[Station]]] = None,
     ) -> str:
         if name is not None:
             if not isinstance(name, str):
@@ -71,8 +71,34 @@ class Workshop(ThreadStation):
         else:
             raise TypeError(f"Unexpected workbench type: {type(workbench)}")
 
+        # TODO: Move all station retrieval logic to a registry class
         if station is None:
             station_creator = InstanceCreator(ThreadStation).bind(
+                workbench_creator=workbench_creator,
+                worker_creator=worker_creator,
+            )
+        elif isinstance(station, str):
+            if station == "thread":
+                station_creator = InstanceCreator(ThreadStation)
+            elif station == "process":
+                from flexplan.stations.process import ProcessStation
+
+                station_creator = InstanceCreator(ProcessStation)
+            elif station == "fork":
+                from flexplan.stations.process import ForkProcessStation
+
+                station_creator = InstanceCreator(ForkProcessStation)
+            elif station == "forkserver":
+                from flexplan.stations.process import ForkServerProcessStation
+
+                station_creator = InstanceCreator(ForkServerProcessStation)
+            elif station == "spawn":
+                from flexplan.stations.process import SpawnProcessStation
+
+                station_creator = InstanceCreator(SpawnProcessStation)
+            else:
+                raise ValueError(f"Unexpected station name: {station}")
+            station_creator = station_creator.bind(
                 workbench_creator=workbench_creator,
                 worker_creator=worker_creator,
             )
