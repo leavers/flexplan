@@ -162,7 +162,7 @@ class FutureProxy(Future, metaclass=FutureProxyMeta):
         except Exception:
             print("exception calling callback for %r", self)
 
-    def unwrap(self) -> Future:
+    def unwrap(self) -> BuiltinFuture:
         return self._future
 
 
