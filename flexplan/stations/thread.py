@@ -6,6 +6,7 @@ from typing_extensions import Optional, override
 from flexplan.datastructures.instancecreator import Creator
 from flexplan.messages.mail import Mail
 from flexplan.stations.base import Station, StationSpec
+from flexplan.utils.atexit import stop_joinable_atexit
 from flexplan.workbench.base import Workbench
 from flexplan.workers.base import Worker
 
@@ -47,6 +48,7 @@ class ThreadStation(Station):
             },
             daemon=True,
         )
+        stop_joinable_atexit(self._thread)
         self._thread.start()
 
         re = self._running_event

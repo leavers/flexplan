@@ -3,8 +3,9 @@ from flexplan import Worker, Workshop
 
 
 class SimpleWorker(Worker):
-    def echo(self):
+    def greet(self):
         print(f"Hello world! The pid of worker is {os.getpid()}")
+        return os.getpid()
 
 
 if __name__ == "__main__":
@@ -12,4 +13,5 @@ if __name__ == "__main__":
     workshop.register(SimpleWorker, station="process")
     with workshop:
         print(f"The pid of main program is {os.getpid()}")
-        workshop.submit(SimpleWorker.echo)
+        future = workshop.submit(SimpleWorker.greet)
+        print(f"The result is {future.result()}")

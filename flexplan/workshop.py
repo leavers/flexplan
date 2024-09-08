@@ -1,3 +1,5 @@
+import atexit
+
 from typing_extensions import (
     Any,
     Callable,

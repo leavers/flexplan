@@ -7,6 +7,7 @@ from flexplan.datastructures.instancecreator import Creator
 from flexplan.messages.mail import Mail
 from flexplan.stations.base import Station, StationSpec
 from flexplan.stations.mixins import NotifyRuntimeInfoMixin, RuntimeInfo
+from flexplan.utils.atexit import stop_joinable_atexit
 from flexplan.workbench.base import Workbench
 from flexplan.workers.base import Worker
 
@@ -71,6 +72,7 @@ class ProcessStation(Station, NotifyRuntimeInfoMixin):
             },
             daemon=True,
         )
+        stop_joinable_atexit(self._process)
         self._process.start()
 
         re = self._running_event
