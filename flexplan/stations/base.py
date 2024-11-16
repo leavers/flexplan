@@ -3,6 +3,8 @@ from types import TracebackType
 
 from typing_extensions import TYPE_CHECKING, Optional, Self, Type
 
+from flexplan.utils.atexit import stop_station_atexit
+
 if TYPE_CHECKING:
     from flexplan.datastructures.instancecreator import Creator
     from flexplan.messages.mail import Mail
@@ -28,6 +30,7 @@ class Station(ABC):
         workbench_creator: "Creator[Workbench]",
         worker_creator: "Creator[Worker]",
     ):
+        stop_station_atexit(self)
         self._workbench_creator = workbench_creator
         self._worker_creator = worker_creator
         self._worker_class = worker_creator.type

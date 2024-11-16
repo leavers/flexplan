@@ -1,17 +1,23 @@
 from typing_extensions import (
-    TYPE_CHECKING,
     Any,
     Callable,
+    Concatenate,
     Dict,
+    Generic,
     List,
     Optional,
+    ParamSpec,
     Self,
     Tuple,
+    TypeVar,
     final,
 )
 
-if TYPE_CHECKING:
-    from flexplan.datastructures.future import Future
+from flexplan.datastructures.future import Future
+
+
+P = ParamSpec("P")
+R = TypeVar("R")
 
 
 @final
@@ -21,10 +27,10 @@ class MessageMeta:
 
 
 @final
-class Message:
+class Message(Generic[P, R]):
     __slots__ = ("instruction", "args", "kwargs", "meta")
 
-    def __init__(self, instruction: Callable):
+    def __init__(self, instruction: Callable[Concatenate[Any, P], R]):
         self.instruction = instruction
         self.args: Optional[Tuple[Any, ...]] = None
         self.kwargs: Optional[Dict[str, Any]] = None
@@ -39,14 +45,14 @@ class Message:
         self.meta.receivers.append((receiver, notify_all))
         return self
 
-    def params(self, *args, **kwargs) -> Self:
+    def params(self, *args: P.args, **kwargs: P.kwargs) -> Self:
         if self.args is not None or self.kwargs is not None:
             raise RuntimeError("Params already set")
         self.args = args
         self.kwargs = kwargs
         return self
 
-    def submit(self) -> "Future":
+    def submit(self) -> Future[R]:
         return self._send(use_future=True)  # type: ignore[return-value]
 
     def emit(self) -> None:

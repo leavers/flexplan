@@ -5,7 +5,7 @@
 groups = ["default", "dev"]
 strategy = ["inherit_metadata"]
 lock_version = "4.5.0"
-content_hash = "sha256:a81b013390128f8e19418c1a07fba44b2a04f32156bb19914d940105d6ad7a86"
+content_hash = "sha256:b8ddcdc5cdd5cf6d43e86742165f3eb55e6731b98d493082b7fe2c1c374ffe03"
 
 [[metadata.targets]]
 requires_python = ">=3.8"
@@ -264,13 +264,13 @@ files = [
 
 [[package]]
 name = "flexexecutor"
-version = "0.0.9"
+version = "0.0.11"
 requires_python = ">=3.8"
 summary = "Executors for both async and sync functions and automatically scales the number of workers"
 groups = ["default"]
 files = [
-    {file = "flexexecutor-0.0.9-py3-none-any.whl", hash = "sha256:4670e0cbcda63a795ee7f5de15cff0eadff870617bc463e9dd8aee35412bffcc"},
-    {file = "flexexecutor-0.0.9.tar.gz", hash = "sha256:174fa5d4db9aeed31dd2e54b021d1c055cfef3a5270e303d13f62cd89f2b5717"},
+    {file = "flexexecutor-0.0.11-py3-none-any.whl", hash = "sha256:dae60baff3379c74aea76fd50614ac29f488fcf62ab5728d12e310de490083ce"},
+    {file = "flexexecutor-0.0.11.tar.gz", hash = "sha256:b883664b700c3cee48cd5c3430e1ab9a04d8fbcb215d64f9473d64eba0f25a3c"},
 ]
 
 [[package]]
