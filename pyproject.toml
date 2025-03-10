@@ -33,6 +33,10 @@ homepage = "https://github.com/leavers/flexplan"
 # documentation = "URL of documentation"
 # changelog = "URL of changelog"
 
+[project.optional-dependencies]
+extra = [
+    "pyzmq>=26.2.1",
+]
 [build-system]
 requires = ["pdm-backend"]
 build-backend = "pdm.backend"
