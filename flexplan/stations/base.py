@@ -9,7 +9,6 @@ if TYPE_CHECKING:
     from flexplan.datastructures.instancecreator import Creator
     from flexplan.messages.mail import Mail
     from flexplan.workbench.base import Workbench
-    from flexplan.workers.base import Worker
 
 
 class StationSpec:
@@ -28,7 +27,7 @@ class Station(ABC):
         self,
         *,
         workbench_creator: "Creator[Workbench]",
-        worker_creator: "Creator[Worker]",
+        worker_creator: "Creator[Type]",
     ):
         stop_station_atexit(self)
         self._workbench_creator = workbench_creator
@@ -64,7 +63,7 @@ class Station(ABC):
     def recv(self, timeout: Optional[float] = None) -> "Optional[Mail]": ...
 
     @property
-    def worker_class(self) -> "Type[Worker]":
+    def worker_class(self) -> "Type":
         return self._worker_class
 
     @property

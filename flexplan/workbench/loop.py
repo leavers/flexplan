@@ -1,6 +1,6 @@
 from queue import Empty
 
-from typing_extensions import TYPE_CHECKING, Optional, override
+from typing_extensions import TYPE_CHECKING, Optional, Type, override
 
 from flexplan.workbench.base import Workbench, WorkbenchContext, enter_worker_context
 
@@ -9,7 +9,6 @@ if TYPE_CHECKING:
     from flexplan.datastructures.types import EventLike
     from flexplan.messages.mail import MailBox
     from flexplan.stations.base import StationSpec
-    from flexplan.workers.base import Worker
 
 
 class LoopWorkbench(Workbench):
@@ -18,7 +17,7 @@ class LoopWorkbench(Workbench):
         self,
         *,
         station_spec: "StationSpec",
-        worker_creator: "Creator[Worker]",
+        worker_creator: "Creator[Type]",
         inbox: "MailBox",
         outbox: "MailBox",
         running_event: "Optional[EventLike]" = None,
@@ -69,7 +68,7 @@ class ConcurrentLoopWorkbench(Workbench):
         self,
         *,
         station_spec: "StationSpec",
-        worker_creator: "Creator[Worker]",
+        worker_creator: "Creator[Type]",
         inbox: "MailBox",
         outbox: "MailBox",
         running_event: "Optional[EventLike]" = None,

@@ -1,7 +1,7 @@
-from flexplan import Worker, Workshop
+from flexplan import Workshop
 
 
-class SimpleWorker(Worker):
+class SimpleWorker:
     def greet(self):
         print("Hello world!")
 

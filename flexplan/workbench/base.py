@@ -14,7 +14,6 @@ if TYPE_CHECKING:
     from flexplan.datastructures.types import EventLike, TracebackType
     from flexplan.messages.mail import Mail, MailBox
     from flexplan.stations.base import StationSpec
-    from flexplan.workers.base import Worker
 
 
 class WorkbenchContext:
@@ -22,13 +21,13 @@ class WorkbenchContext:
         self,
         *,
         station_spec: "StationSpec",
-        worker: "Worker",
+        worker: Type,
         outbox: "MailBox",
         process_future_manager_address: Any = None,
         **_,
     ) -> None:
         self._station_spec = station_spec
-        self._worker_ref: "ReferenceType[Worker]" = ref(worker)
+        self._worker_ref: "ReferenceType[Type]" = ref(worker)
         self._outbox_ref: "ReferenceType[MailBox]" = ref(outbox)
         self._worker_cls = type(worker)
         self._process_future_manager_address = process_future_manager_address
@@ -100,7 +99,7 @@ class Workbench(ABC):
         self,
         *,
         station_spec: "StationSpec",
-        worker_creator: "Creator[Worker]",
+        worker_creator: "Creator[Type]",
         inbox: "MailBox",
         outbox: "MailBox",
         running_event: "Optional[EventLike]" = None,
@@ -113,10 +112,10 @@ class Workbench(ABC):
 class _EnterWorkerContext:
     __slots__ = ("worker",)
 
-    def __init__(self, worker: "Worker") -> None:
+    def __init__(self, worker: Type) -> None:
         self.worker = worker
 
-    def __enter__(self) -> "Worker":
+    def __enter__(self) -> Type:
         if hasattr(self.worker, "__enter__"):
             self.worker.__enter__()
         return self.worker

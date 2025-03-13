@@ -8,7 +8,6 @@ from flexplan.messages.mail import Mail
 from flexplan.stations.base import Station, StationSpec
 from flexplan.utils.atexit import stop_joinable_atexit
 from flexplan.workbench.base import Workbench
-from flexplan.workers.base import Worker
 
 
 class ThreadStation(Station):
@@ -16,7 +15,7 @@ class ThreadStation(Station):
         self,
         *,
         workbench_creator: Creator[Workbench],
-        worker_creator: Creator[Worker],
+        worker_creator: Creator,
     ):
         super().__init__(
             workbench_creator=workbench_creator,

@@ -1,19 +1,19 @@
-from flexplan import Message, Workshop, Worker
+from flexplan import Message, Workshop
 
 
-class One(Worker):
+class FirstWorker:
     def greet(self):
         print("One!")
-        Message(Two.greet).emit()
+        Message(SecondWorker.greet).emit()
 
 
-class Two(Worker):
+class SecondWorker:
     def greet(self):
         print("Two!")
-        Message(Three.greet).emit()
+        Message(ThirdWorker.greet).emit()
 
 
-class Three(Worker):
+class ThirdWorker:
     def greet(self):
         print("Three!")
 
@@ -22,9 +22,9 @@ if __name__ == "__main__":
     import time
 
     workshop = Workshop()
-    workshop.register(One)
-    workshop.register(Two)
-    workshop.register(Three)
+    workshop.register(FirstWorker)
+    workshop.register(SecondWorker)
+    workshop.register(ThirdWorker)
     with workshop:
-        workshop.submit(One.greet)
+        workshop.submit(FirstWorker.greet)
         time.sleep(1)

@@ -29,7 +29,6 @@ from flexplan.stations.base import Station, StationSpec
 from flexplan.stations.mixins import NotifyRuntimeInfoMixin, RuntimeInfo
 from flexplan.utils.inspect import get_method_class
 from flexplan.workbench.base import Workbench, WorkbenchContext, enter_worker_context
-from flexplan.workers.base import Worker
 
 if TYPE_CHECKING:
     from flexplan.datastructures.instancecreator import Creator
@@ -37,7 +36,7 @@ if TYPE_CHECKING:
     from flexplan.types import WorkerId, WorkerSpec
 
 
-class Supervisor(Worker):
+class Supervisor:
     def __init__(
         self,
         worker_specs: "Optional[List[WorkerSpec]]" = None,
@@ -63,7 +62,7 @@ class Supervisor(Worker):
                 _specs[worker_id] = (name, station_creator)
         self._specs = _specs
         self._worker_stations: "Dict[WorkerId, Station]" = {}
-        self._process_future_manager: Optional[ProcessFutureManager] = None
+        self._mp_future_manager: Optional[ProcessFutureManager] = None
 
     def __post_init__(self):
         worker_stations = self._worker_stations
@@ -73,11 +72,11 @@ class Supervisor(Worker):
         for worker_id, (name, station_creator) in self._specs.items():
             station = station_creator.create()
             if station.spec.use_process_future:
-                if self._process_future_manager is None:
-                    self._process_future_manager = ProcessFutureManager()
-                    self._process_future_manager.start()
+                if self._mp_future_manager is None:
+                    self._mp_future_manager = ProcessFutureManager()
+                    self._mp_future_manager.start()
                     info.process_future_manager_address = (
-                        self._process_future_manager.address
+                        self._mp_future_manager.address
                     )
                     print(f"{info.process_future_manager_address=}")
             if isinstance(station, NotifyRuntimeInfoMixin):
@@ -97,9 +96,9 @@ class Supervisor(Worker):
     ) -> None:
         for station in self._worker_stations.values():
             station.stop()
-        if self._process_future_manager is not None:
-            self._process_future_manager.shutdown()
-            self._process_future_manager = None
+        if self._mp_future_manager is not None:
+            self._mp_future_manager.shutdown()
+            self._mp_future_manager = None
 
     def relay(self, mail: Mail):
         instruction = mail.instruction
@@ -139,7 +138,7 @@ class Supervisor(Worker):
                     if isinstance(box, DeferredBox):
                         if station.spec.use_process_future:
                             print("ProcessFuture")
-                            future = self._process_future_manager.Future()
+                            future = self._mp_future_manager.Future()
                         else:
                             print("Normal Future")
                             future: Future = Future()
@@ -214,7 +213,7 @@ class SupervisorWorkbench(Workbench):
         self,
         *,
         station_spec: "StationSpec",
-        worker_creator: "Creator[Worker]",
+        worker_creator: "Creator[Type]",
         inbox: "MailBox",
         outbox: "MailBox",
         running_event: "Optional[EventLike]" = None,

@@ -1,8 +1,8 @@
 import os
-from flexplan import Worker, Workshop
+from flexplan import Workshop
 
 
-class SimpleWorker(Worker):
+class SimpleWorker:
     def greet(self):
         print(f"Hello world! The pid of worker is {os.getpid()}")
         return os.getpid()
