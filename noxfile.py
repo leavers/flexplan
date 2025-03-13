@@ -7,14 +7,18 @@ from typing import Any, Dict
 import nox
 from nox import Session
 from nox.command import CommandFailed
-from rtoml import load
+
+if sys.version_info < (3, 11):
+    from tomli import load
+else:
+    from tomllib import load
 
 os.environ.update({"PDM_IGNORE_SAVED_PYTHON": "1"})
 
 
 @lru_cache(maxsize=1)
 def get_pyproject_toml() -> Dict[str, Any]:
-    with open("pyproject.toml") as fp:
+    with open("pyproject.toml", mode="rb") as fp:
         return load(fp)
 
 
@@ -32,7 +36,7 @@ def get_dev_dependencies() -> Dict[str, str]:
     pyproject = get_pyproject_toml()
     pat = re.compile(r"[ <>~=]")
     dev_deps: Dict[str, str] = {}
-    for dep in pyproject["tool"]["pdm"]["dev-dependencies"]["dev"]:
+    for dep in pyproject["dependency-groups"]["dev"]:
         sep = -1
         for m in pat.finditer(dep):
             sep = m.span()[0]
@@ -112,6 +116,25 @@ def format(session: Session, autoflake: str, ruff: str):
     session.run("ruff", "--version")
     session.run("ruff", "check", "--select", "I", "--fix", *SOURCES)
     session.run("ruff", "format", *SOURCES)
+
+
+@nox.session(python=PYTHON_VERSION, reuse_venv=True)
+@nox.parametrize("autoflake", [AUTOFLAKE_VERSION])
+@nox.parametrize("ruff", [RUFF_VERSION])
+def format_check(session: Session, autoflake: str, ruff: str):
+    session.install(autoflake, ruff)
+    try:
+        session.run("taplo", "check", "pyproject.toml", external=True)
+    except CommandFailed:
+        session.warn(
+            "Seems that `taplo` is not found, skip checking `pyproject.toml`. "
+            "(Refer to https://taplo.tamasfe.dev/ for information on how to install "
+            "`taplo`)"
+        )
+    session.run("autoflake", "--version")
+    session.run("autoflake", "--check-diff", *SOURCES)
+    session.run("ruff", "--version")
+    session.run("ruff", "format", "--check", "--diff", *SOURCES)
 
 
 @nox.session(python=PYTHON_VERSION, reuse_venv=True)

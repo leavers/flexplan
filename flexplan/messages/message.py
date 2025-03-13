@@ -15,7 +15,6 @@ from typing_extensions import (
 
 from flexplan.datastructures.future import Future
 
-
 P = ParamSpec("P")
 R = TypeVar("R")
 
