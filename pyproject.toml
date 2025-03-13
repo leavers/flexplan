@@ -5,7 +5,7 @@ authors = [
   { name = "Leavers" },
   { name = "Leavers", email = "leavers930@gmail.com" },
 ]
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 readme = "README.md"
 license = { text = "MIT" }
 classifiers = [
@@ -14,11 +14,11 @@ classifiers = [
   "Operating System :: OS Independent",
   "Programming Language :: Python",
   "Programming Language :: Python :: 3",
-  "Programming Language :: Python :: 3.8",
   "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
   "Topic :: Home Automation",
   "Topic :: Software Development",
   "Topic :: Software Development :: Libraries :: Python Modules",
@@ -32,6 +32,8 @@ homepage = "https://github.com/leavers/flexplan"
 # documentation = "URL of documentation"
 # changelog = "URL of changelog"
 
+[project.optional-dependencies]
+extra = ["pyzmq>=26.2.1"]
 [build-system]
 requires = ["pdm-backend"]
 build-backend = "pdm.backend"
@@ -46,19 +48,6 @@ excludes = ["examples", "tests"]
 [tool.pdm.version]
 source = "file"
 path = "flexplan/__init__.py"
-
-[tool.pdm.dev-dependencies]
-dev = [
-  "autoflake>=2.3.1",
-  "mypy>=1.11.1",
-  "nox>=2024.4.15",
-  "pytest>=8.3.2",
-  "pytest-asyncio>=0.23.8",
-  "pytest-cov>=5.0.0",
-  "pytest-timeout>=2.3.1",
-  "rtoml>=0.11.0",
-  "ruff>=0.6.1",
-]
 
 [tool.autoflake]
 in-place = true
@@ -88,3 +77,16 @@ asyncio_mode = "strict"
 [tool.ruff]
 line-length = 88
 target-version = "py38"
+
+[dependency-groups]
+dev = [
+  "autoflake>=2.3.1",
+  "mypy>=1.11.1",
+  "nox>=2024.4.15",
+  "pytest>=8.3.2",
+  "pytest-asyncio>=0.23.8",
+  "pytest-cov>=5.0.0",
+  "pytest-timeout>=2.3.1",
+  "ruff>=0.9.10",
+  "tomli>=2.2.1; python_version < \"3.11\"",
+]
