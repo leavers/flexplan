@@ -9,7 +9,7 @@ class Tester(Worker):
 def test_thread_station():
     from flexplan.datastructures.future import Future
     from flexplan.datastructures.instancecreator import InstanceCreator
-    from flexplan.mail import ContactInfo, Mail, MailMeta
+    from flexplan.mails import ContactInfo, Mail, MailMeta
     from flexplan.stations.thread import ThreadStation
     from flexplan.workbench.loop import LoopWorkbench
 

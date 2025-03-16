@@ -23,8 +23,8 @@ from flexplan.errors import (
     WorkerNotFoundError,
     WorkerRuntimeError,
 )
-from flexplan.mail import Mail, MailBox
-from flexplan.message import Message
+from flexplan.mails import Mail, MailBox
+from flexplan.messages import Message
 from flexplan.stations.base import Station, StationSpec
 from flexplan.stations.mixins import NotifyRuntimeInfoMixin, RuntimeInfo
 from flexplan.utils.inspect import get_method_class

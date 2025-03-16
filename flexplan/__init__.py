@@ -1,5 +1,5 @@
 from flexplan.datastructures.future import Future
-from flexplan.message import Message
+from flexplan.messages import Message
 from flexplan.workbench.base import Workbench
 from flexplan.workshop import Workshop
 

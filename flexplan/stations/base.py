@@ -7,7 +7,7 @@ from flexplan.utils.atexit import stop_station_atexit
 
 if TYPE_CHECKING:
     from flexplan.datastructures.instancecreator import Creator
-    from flexplan.mail import Mail
+    from flexplan.mails import Mail
     from flexplan.workbench.base import Workbench
 
 
