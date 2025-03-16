@@ -1,13 +1,13 @@
-from flexplan import Worker, Workshop
+from flexplan import Workshop
 
 
-class SimpleWorker(Worker):
+class SimpleWorker:
     def greet(self):
         print("Hello world!")
 
 
 if __name__ == "__main__":
     workshop = Workshop()
-    workshop.register(SimpleWorker)
+    workshop.add(SimpleWorker)
     with workshop:
         workshop.submit(SimpleWorker.greet)

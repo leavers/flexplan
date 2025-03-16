@@ -13,7 +13,7 @@ from typing_extensions import (
 from flexplan.datastructures.deferredbox import DeferredBox
 from flexplan.datastructures.future import Future
 from flexplan.datastructures.types import QueueLike
-from flexplan.messages.message import Message
+from flexplan.messages import Message
 
 
 @final

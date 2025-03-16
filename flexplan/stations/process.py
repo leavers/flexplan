@@ -4,12 +4,11 @@ from queue import Empty
 from typing_extensions import TYPE_CHECKING, Optional, Union, override
 
 from flexplan.datastructures.instancecreator import Creator
-from flexplan.messages.mail import Mail
+from flexplan.mails import Mail
 from flexplan.stations.base import Station, StationSpec
 from flexplan.stations.mixins import NotifyRuntimeInfoMixin, RuntimeInfo
 from flexplan.utils.atexit import stop_joinable_atexit
 from flexplan.workbench.base import Workbench
-from flexplan.workers.base import Worker
 
 if TYPE_CHECKING:
     from multiprocessing.context import ForkContext, ForkServerContext, SpawnContext
@@ -23,7 +22,7 @@ class ProcessStation(Station, NotifyRuntimeInfoMixin):
         self,
         *,
         workbench_creator: Creator[Workbench],
-        worker_creator: Creator[Worker],
+        worker_creator: Creator,
         mp_context: "Optional[AnyContext]" = None,
     ):
         super().__init__(
@@ -119,7 +118,7 @@ class ForkProcessStation(ProcessStation):
         self,
         *,
         workbench_creator: Creator[Workbench],
-        worker_creator: Creator[Worker],
+        worker_creator: Creator,
     ):
         super().__init__(
             workbench_creator=workbench_creator,
@@ -133,7 +132,7 @@ class ForkServerProcessStation(ProcessStation):
         self,
         *,
         workbench_creator: Creator[Workbench],
-        worker_creator: Creator[Worker],
+        worker_creator: Creator,
     ):
         super().__init__(
             workbench_creator=workbench_creator,
@@ -147,7 +146,7 @@ class SpawnProcessStation(ProcessStation):
         self,
         *,
         workbench_creator: Creator[Workbench],
-        worker_creator: Creator[Worker],
+        worker_creator: Creator,
     ):
         super().__init__(
             workbench_creator=workbench_creator,

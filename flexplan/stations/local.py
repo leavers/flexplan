@@ -3,7 +3,6 @@ import typing_extensions as t
 from flexplan.datastructures.instancecreator import InstanceCreator
 from flexplan.stations.base import Station
 from flexplan.workbench.base import Workbench
-from flexplan.workers.base import Worker
 
 
 class DummyQueue(list):
@@ -25,7 +24,7 @@ class LocalStation(Station):
         self,
         *,
         workbench_creator: InstanceCreator[Workbench],
-        worker_creator: InstanceCreator[Worker],
+        worker_creator: InstanceCreator,
     ):
         super().__init__(
             workbench_creator=workbench_creator,

@@ -1,3 +1,4 @@
+from inspect import isfunction
 from typing_extensions import (
     Any,
     Callable,
@@ -19,8 +20,8 @@ from typing_extensions import (
 from flexplan.datastructures.deferredbox import DeferredBox
 from flexplan.datastructures.future import Future
 from flexplan.datastructures.instancecreator import Creator, InstanceCreator
-from flexplan.messages.mail import Mail
-from flexplan.messages.message import Message
+from flexplan.mails import Mail
+from flexplan.messages import Message
 from flexplan.stations.base import Station
 from flexplan.stations.process import (
     ForkProcessStation,
@@ -34,7 +35,6 @@ from flexplan.types import WorkerSpec
 from flexplan.utils.identity import gen_worker_id
 from flexplan.workbench.base import Workbench
 from flexplan.workbench.loop import LoopWorkbench
-from flexplan.workers.base import Worker
 
 __all__ = (
     "Workshop",
@@ -203,9 +203,9 @@ class Workshop(ThreadStation):
         )
         self._registry = ScopedWorkshopRegistry()
 
-    def register(
+    def add(
         self,
-        worker: Union[Type[Worker], Creator[Worker]],
+        worker: Union[Type, Creator],
         name: Optional[str] = None,
         *,
         station: Optional[Union[Type[Station], Creator[Station], str]] = None,
@@ -217,16 +217,16 @@ class Workshop(ThreadStation):
             elif not name:
                 raise ValueError("Name must be non-empty string")
 
-        worker_creator: Creator[Worker]
+        worker_creator: Creator
         workbench_creator: Creator[Workbench]
         station_creator: Creator[Station]
 
         if isinstance(worker, InstanceCreator):
             worker_creator = worker
-        elif issubclass(wk_t := cast(Type[Worker], worker), Worker):
-            worker_creator = InstanceCreator(wk_t)
-        else:
+        elif isfunction(worker):
             raise TypeError(f"Unexpected worker type: {type(worker)}")
+        else:
+            worker_creator = InstanceCreator(cast(Type, worker))
 
         if workbench is None:
             workbench_creator = InstanceCreator(LoopWorkbench)
