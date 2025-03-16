@@ -19,8 +19,8 @@ from typing_extensions import (
 from flexplan.datastructures.deferredbox import DeferredBox
 from flexplan.datastructures.future import Future
 from flexplan.datastructures.instancecreator import Creator, InstanceCreator
-from flexplan.messages.mail import Mail
-from flexplan.messages.message import Message
+from flexplan.mail import Mail
+from flexplan.message import Message
 from flexplan.stations.base import Station
 from flexplan.stations.process import (
     ForkProcessStation,

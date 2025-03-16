@@ -4,7 +4,7 @@ from queue import Empty
 from typing_extensions import TYPE_CHECKING, Optional, Union, override
 
 from flexplan.datastructures.instancecreator import Creator
-from flexplan.messages.mail import Mail
+from flexplan.mail import Mail
 from flexplan.stations.base import Station, StationSpec
 from flexplan.stations.mixins import NotifyRuntimeInfoMixin, RuntimeInfo
 from flexplan.utils.atexit import stop_joinable_atexit

@@ -59,7 +59,7 @@ class Message(Generic[P, R]):
 
     def _send(self, use_future: bool) -> "Optional[Future]":
         from flexplan.datastructures.future import Future
-        from flexplan.messages.mail import Mail
+        from flexplan.mail import Mail
         from flexplan.workbench.base import WorkbenchContext
 
         context = WorkbenchContext.get_context(2)

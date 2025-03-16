@@ -7,7 +7,7 @@ from flexplan.workbench.base import Workbench, WorkbenchContext, enter_worker_co
 if TYPE_CHECKING:
     from flexplan.datastructures.instancecreator import Creator
     from flexplan.datastructures.types import EventLike
-    from flexplan.messages.mail import MailBox
+    from flexplan.mail import MailBox
     from flexplan.stations.base import StationSpec
 
 

@@ -4,7 +4,7 @@ from threading import Event, Thread
 from typing_extensions import Optional, override
 
 from flexplan.datastructures.instancecreator import Creator
-from flexplan.messages.mail import Mail
+from flexplan.mail import Mail
 from flexplan.stations.base import Station, StationSpec
 from flexplan.utils.atexit import stop_joinable_atexit
 from flexplan.workbench.base import Workbench

@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 
     from flexplan.datastructures.instancecreator import Creator
     from flexplan.datastructures.types import EventLike, TracebackType
-    from flexplan.messages.mail import Mail, MailBox
+    from flexplan.mail import Mail, MailBox
     from flexplan.stations.base import StationSpec
 
 

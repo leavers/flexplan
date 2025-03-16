@@ -5,7 +5,7 @@ from typing_extensions import TYPE_CHECKING
 from flexplan.workbench.base import Workbench
 
 if TYPE_CHECKING:
-    from flexplan.messages.mail import MailBox
+    from flexplan.mail import MailBox
 
 
 class SimpleWorkbench(Workbench):
