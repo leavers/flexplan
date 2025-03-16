@@ -10,7 +10,7 @@ class SimpleWorker:
 
 if __name__ == "__main__":
     workshop = Workshop()
-    workshop.register(SimpleWorker, station="process")
+    workshop.add(SimpleWorker, station="process")
     with workshop:
         print(f"The pid of main program is {os.getpid()}")
         future = workshop.submit(SimpleWorker.greet)

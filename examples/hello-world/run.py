@@ -8,6 +8,6 @@ class SimpleWorker:
 
 if __name__ == "__main__":
     workshop = Workshop()
-    workshop.register(SimpleWorker)
+    workshop.add(SimpleWorker)
     with workshop:
         workshop.submit(SimpleWorker.greet)

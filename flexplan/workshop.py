@@ -1,3 +1,4 @@
+from inspect import isfunction
 from typing_extensions import (
     Any,
     Callable,
@@ -202,7 +203,7 @@ class Workshop(ThreadStation):
         )
         self._registry = ScopedWorkshopRegistry()
 
-    def register(
+    def add(
         self,
         worker: Union[Type, Creator],
         name: Optional[str] = None,
@@ -222,10 +223,10 @@ class Workshop(ThreadStation):
 
         if isinstance(worker, InstanceCreator):
             worker_creator = worker
-        elif issubclass(wk_t := cast(Type, worker), Type):
-            worker_creator = InstanceCreator(wk_t)
-        else:
+        elif isfunction(worker):
             raise TypeError(f"Unexpected worker type: {type(worker)}")
+        else:
+            worker_creator = InstanceCreator(cast(Type, worker))
 
         if workbench is None:
             workbench_creator = InstanceCreator(LoopWorkbench)

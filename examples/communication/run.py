@@ -22,9 +22,9 @@ if __name__ == "__main__":
     import time
 
     workshop = Workshop()
-    workshop.register(FirstWorker)
-    workshop.register(SecondWorker)
-    workshop.register(ThirdWorker)
+    workshop.add(FirstWorker)
+    workshop.add(SecondWorker)
+    workshop.add(ThirdWorker)
     with workshop:
         workshop.submit(FirstWorker.greet)
         time.sleep(1)
